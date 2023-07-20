@@ -6,6 +6,21 @@ Adafruit_MPU6050 mpu;
 
 double accelerationZeroThreshold = 3;
 
+// TODO Connect to Wifi
+
+// TODO Shake detection for start/top
+//      Buzzer to indicate start/stop
+
+// TODO Post to Web API
+
+// TODO Get Hardware ID
+
+// TODO Basic Web Server for device info & setup instructions
+
+// TODO Log to SD card
+
+// TODO Real Time Clock?
+
 void setup() {
   Serial.begin(115200);
 
