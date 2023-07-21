@@ -1,19 +1,48 @@
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
 #include <Wire.h>
+#include <ESP8266HTTPClient.h>
+#include <ESP8266WiFi.h>
+
+#include "config.h"
+
+// Device & Server Config
+const char* UUID = ""; // Auto-filled from MAC Address during setup()
+
+// Stateful
+bool isRecording = false;
+
+// Thresholds
+double accelerationZeroThreshold = 3;
+int wifiTimeout = 10;
+int serialBaud = 115200;
 
 Adafruit_MPU6050 mpu;
+HTTPClient http;
 
-double accelerationZeroThreshold = 3;
+/** SETUP **/
+bool setupWifi() {
+  WiFi.config();
+  WiFi.begin(WIFI_SSID, WIFI_PASS); 
 
-// TODO Connect to Wifi
+  while (WiFi.status() != WL_CONNECTED && wifiTimeout > 0) {
+    Serial.println("Waiting for connection");
+    delay(5000);
+    
+    wifiTimeout--;
+  }
+
+  return WiFi.status() != WL_CONNECTED;
+}
+
+String getDeviceUID() {
+  return String(ESP.getChipId());
+}
 
 // TODO Shake detection for start/top
 //      Buzzer to indicate start/stop
 
 // TODO Post to Web API
-
-// TODO Get Hardware ID
 
 // TODO Basic Web Server for device info & setup instructions
 
@@ -22,17 +51,29 @@ double accelerationZeroThreshold = 3;
 // TODO Real Time Clock?
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(serialBaud);
 
-  // Try to initialize!
+  // Init Gyro
   if (!mpu.begin()) {
     Serial.println("Failed to find MPU6050 chip");
-    while (1) {
-      delay(10);
-    }
+    return;
   }
   Serial.println("MPU6050 Found!");
 
+  // Setup Wifi
+  if (!setupWifi()) {
+    Serial.println("Failed to setup wifi");
+    return;
+  }
+  Serial.println("WIFI Connected!");
+
+  // Setup Device ID
+  UUID = getDeviceUID();
+  Serial.print("Device UUID: ");
+  Serial.println(UUID);
+
+  // Reset Recording State
+  isRecording = false;
 }
 
 void loop() {
@@ -51,7 +92,7 @@ void loop() {
 
 
   Serial.print("Direction: ");
-  Serial.println(accelerationCalc(a.acceleration.x, a.acceleration.y, a.acceleration.z));
+  Serial.println(getFace(a.acceleration.x, a.acceleration.y, a.acceleration.z));
 
   Serial.println("");
   delay(1500);
@@ -65,7 +106,7 @@ bool zeroThreshold(double val) {
   return (absVal >= 0 && absVal <= accelerationZeroThreshold);
 }
 
-String accelerationCalc(double x, double y, double z) {
+String getFace(double x, double y, double z) {
   String face;
   // 6-Sides
 
@@ -107,4 +148,25 @@ String accelerationCalc(double x, double y, double z) {
   }
 
   return face;
+}
+
+void startRecordingTask(String faceName) {
+  http.begin(API);
+  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+  http.addHeader("APIKEY", APIKEY);
+
+  String postData = "DiceUUID=" + UUID + "&FaceName=" + faceName;
+
+  int httpCode = http.POST(postData);
+  String payload = http.getString();
+
+  Serial.println(postData);
+  Serial.println(httpCode);
+  Serial.println(payload);
+
+  http.end();
+}
+
+void stopRecordingTask() {
+  // TODO
 }
