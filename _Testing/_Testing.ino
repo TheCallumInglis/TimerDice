@@ -3,6 +3,7 @@
 #include <Wire.h>
 #include <ESP8266HTTPClient.h>
 #include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
 
 #include "config.h"
 
@@ -19,6 +20,7 @@ int serialBaud = 115200;
 
 Adafruit_MPU6050 mpu;
 HTTPClient http;
+ESP8266WebServer webserver(80);
 
 /** SETUP **/
 bool setupWifi() {
@@ -41,8 +43,6 @@ String getDeviceUID() {
 
 // TODO Shake detection for start/top
 //      Buzzer to indicate start/stop
-
-// TODO Post to Web API
 
 // TODO Basic Web Server for device info & setup instructions
 
@@ -74,9 +74,16 @@ void setup() {
 
   // Reset Recording State
   isRecording = false;
+
+  // Start Web Server
+  webserver.on("/", httpIndex);
+  webserver.begin();
 }
 
 void loop() {
+  /* Listen for Web Requests */
+  webserver.handleClient(); 
+
   /* Get new sensor events with the readings */
   sensors_event_t a, g, temp;
   mpu.getEvent(&a, &g, &temp);
@@ -151,7 +158,7 @@ String getFace(double x, double y, double z) {
 }
 
 void startRecordingTask(String faceName) {
-  http.begin(API);
+  http.begin(API + "recording/start");
   http.addHeader("Content-Type", "application/x-www-form-urlencoded");
   http.addHeader("APIKEY", APIKEY);
 
@@ -169,4 +176,9 @@ void startRecordingTask(String faceName) {
 
 void stopRecordingTask() {
   // TODO
+}
+
+/** HTTP Server **/
+void httpIndex() { 
+  webserver.send(200, "text/plain", "Hello World! Device UUID: " + UUID); 
 }
