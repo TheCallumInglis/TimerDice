@@ -14,6 +14,8 @@
 
 // Stateful
 bool isRecording = false;
+int recordingID;
+char recordingFile[32];
 bool isMotion = false;
 int slack = 0;
 
@@ -110,7 +112,20 @@ bool setupSD() {
     return false;
   }
 
-  Serial.println("Init done.");
+  // Check Directories Exist
+  if (!SD.exists(RECORDING_DIR)) {
+    Serial.print("RECORDING_DIR does not exist... will try and create directory ");
+    Serial.print(RECORDING_DIR);
+
+    // Try create it
+    if (!SD.mkdir(RECORDING_DIR)) {
+      Serial.print(" Failed to create directory!");
+      return false;
+    }
+    Serial.println(" Directory Created!");
+  }
+
+  Serial.println("[SD Card] Init done.");
   return true;
 }
 
@@ -129,6 +144,9 @@ void setupInitVars() {
   // Reset Recording State
   isRecording = false;
   isMotion = false;  
+
+  // Seed Random
+  srand(rtc.now().unixtime());
 }
 
 void setupNotice() {
@@ -211,6 +229,29 @@ String getDateTimeNow() {
   return now.toString(buffer);
 }
 
+int getRandomTaskID() {
+  return rand() % 100000 + 10000; // 10,000 - 100,000
+}
+
+void getNewRecordingFilepath(char* outRecordingFile) {
+  char buffer[6]; // For Recording ID
+
+  char filepath[32]; // New filepath
+  strcpy(filepath, "");
+
+  // Find unique filepath
+  while (strlen(filepath) == 0 || SD.exists(filepath)) {
+    recordingID = getRandomTaskID();
+    sprintf(buffer, "%d", recordingID);
+
+    strcpy(filepath, RECORDING_DIR);
+    strcat(filepath, buffer);
+    strcat(filepath, ".xml");
+  }
+
+  strcpy(outRecordingFile, filepath);
+}
+
 void blink(uint8_t Pin, int Count, int Duration) {
   for (int i = 0; i < Count; i++) {
     digitalWrite(Pin, HIGH); 
@@ -230,20 +271,23 @@ void motionDetected() {
   if (isRecording) {
     Serial.println("Stopping Recording");
     blink(BUZZER, 2, 150);
-    // TODO Handle Stop Recording
+    logStopRecording();
+    isRecording = false;
     
   } else {
     Serial.println("Starting Recording");
     blink(BUZZER, 1, 300);
-    handleRecordingStart();
+    delay(1000);
+    if (handleRecordingStart()) {
+      isRecording = true;
+    }
   }
 
-  isRecording = !isRecording;
   isMotion = false;
   delay(250);
 }
 
-void handleRecordingStart() {
+bool handleRecordingStart() {
   String direction = "";
   sensors_event_t a, g, temp;
 
@@ -274,29 +318,32 @@ void handleRecordingStart() {
     isRecording = false;
     isMotion = false;
     slack = 0;
-    return;
+    return false;
   }
   
   Serial.println(direction);
 
   // TODO Log Start
-  logStartRecording(direction);
+  return logStartRecording(direction);
 }
 
 bool logStartRecording(String face) {
-  File dataFile = SD.open(RECORDING_FILE, FILE_WRITE);
+  getNewRecordingFilepath(recordingFile);
+
+  File dataFile = SD.open(recordingFile, FILE_WRITE);
+  Serial.print("Recording File Path: "); Serial.println(recordingFile);
 
   if (!dataFile) { 
     Serial.print("[logStartRecording] Error opening");
-    Serial.println(RECORDING_FILE);
+    Serial.println(recordingFile);
     return false;
   }
 
-  String dataString = ""; // UID,FACE,START,END
-  dataString += getDeviceUID(); dataString += ","; // Device UID
-  dataString += face; dataString += ","; // Face
-  dataString += getDateTimeNow(); dataString += ","; // Start Time
-  dataString += "null"; // End Time = null
+  String dataString = "";
+  dataString += "<deviceUID>"; dataString += getDeviceUID(); dataString += "</deviceUID>\r\n"; // Device UID
+  dataString += "<recordingID>"; dataString += recordingID; dataString += "</recordingID>\r\n"; // Recording ID (Local)
+  dataString += "<face>"; dataString += face; dataString += "</face>\r\n"; // Dice Face
+  dataString += "<start>"; dataString += getDateTimeNow(); dataString += "</start>"; // Start Date/Time
 
   dataFile.println(dataString);
   dataFile.close();
@@ -306,15 +353,26 @@ bool logStartRecording(String face) {
 }
 
 bool logStopRecording() {
-  File dataFile = SD.open(RECORDING_FILE, FILE_READ);
-
-  if (!dataFile) { 
-    Serial.print("[logStartRecording] Error opening");
-    Serial.println(RECORDING_FILE);
+  if (!SD.exists(recordingFile)) {
+    Serial.print("[logStartRecording] Error opening (File does not exist): ");
+    Serial.println(recordingFile);
     return false;
   }
 
-  // TODO Close Recording Line
+  File dataFile = SD.open(recordingFile, FILE_WRITE);
+
+  if (!dataFile) { 
+    Serial.print("[logStartRecording] Error opening");
+    Serial.println(recordingFile);
+    return false;
+  }
+
+  String dataString = "";
+  dataString += "<end>"; dataString += getDateTimeNow(); dataString += "</end>"; // End Date/Time
+
+  dataFile.println(dataString);
+  dataFile.close();
+  Serial.println(dataString);
   return true;
 }
 
