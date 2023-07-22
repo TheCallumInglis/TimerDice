@@ -8,12 +8,9 @@
 #include <ESP8266HTTPClient.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
+#include "RTClib.h"
 
 #include "config.h"
-
-// SD Card
-const int SdChipSelect = D4;
-File myFile;
 
 // Stateful
 bool isRecording = false;
@@ -21,17 +18,25 @@ bool isMotion = false;
 int slack = 0;
 
 // Thresholds
-double accelerationZeroThreshold = 3;
-int wifiTimeout = 10;
-int serialBaud = 9600;
 int searchDirectionTimeout = SEARCH_DIRECTION_THRESHOLD * 1000 / SEARCH_DIRECTION_INTERVAL;
 
+// SD Card
+const int SdChipSelect = D4;
+File myFile;
+
+// Instance
 Adafruit_MPU6050 mpu;
 HTTPClient http;
 WiFiClient client;
 ESP8266WebServer webserver(80);
+RTC_DS1307 rtc;
 
-/** SETUP **/
+char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+
+// TODO Log to SD card
+// TODO Real Time Clock?
+
+/** SETUP :: Start **/
 bool setupWifi() {
   WiFi.hostname(getDeviceUID());
   WiFi.begin(WIFI_SSID, WIFI_PASS); 
@@ -59,7 +64,7 @@ void setupBuzzer() {
 bool setupMPU() {
   Serial.println("[MPU6050] :: Connecting...!");
 
-  if (!mpu.begin()) {
+  if (!mpu.begin(GRYO_I2C)) {
     Serial.println("[MPU6050] :: Failed to find MPU6050 chip");
     return false;
   }
@@ -77,11 +82,45 @@ bool setupMPU() {
   return true;
 }
 
+bool setupRTC() {
+  Serial.print("[RTC] :: Init...");
+
+  if (!rtc.begin()) {
+    Serial.println("Failed");
+    return false;
+  }
+  Serial.println("Found!");
+
+  Serial.println("[RTC] :: Setting the time now...");
+  rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+  Serial.println("[RTC] :: Time has been set");
+
+  DateTime now = rtc.now();
+  Serial.print("[RTC] :: The Time is Now: ");
+  Serial.println(getDateTimeNow());
+
+  return true;
+}
+
+bool setupSD() {
+  Serial.print("[SD Card] Initializing SD card... ");
+
+  if (!SD.begin(SdChipSelect)) {
+    Serial.println("Init failed!");
+    return false;
+  }
+
+  Serial.println("Init done.");
+  return true;
+}
+
 void setupWebServer() {
   Serial.println("[webserver] :: Starting...");
 
   webserver.on("/", httpIndex);
   webserver.begin();
+
+  webserver.handleClient(); // Listen for Web Requests
 
   Serial.println("[webserver] :: Started");
 }
@@ -92,17 +131,55 @@ void setupInitVars() {
   isMotion = false;  
 }
 
-// bool setupSD() {
-//   Serial.print("Initializing SD card... ");
+void setupNotice() {
+  // Device ID
+  Serial.print("[NOTICE] :: Device UUID: ");
+  Serial.println(getDeviceUID());
 
-//   if (!SD.begin(SdChipSelect)) {
-//     Serial.println("initialization failed!");
-//     return false;
-//   }
+  // Search Duration Timeout
+  Serial.print("[NOTICE] :: We will make ");
+  Serial.print(searchDirectionTimeout);
+  Serial.println(" attempts to determine direction/orientation after recording start.");
 
-//   Serial.println("initialization done.");
-//   return true;
-// }
+  // Ready To Go
+  blink(BUZZER, 2, 100);
+  Serial.println();
+}
+
+void setup() {
+  Serial.begin(SERIAL_BAUD);
+  
+  setupBuzzer(); // Setup Buzzer (Shut the thing up if pin is HIGH on boot)
+
+  // Setup MPU6050 (Gyro)1
+  if (!setupMPU()) {
+    Serial.println("[ERROR] :: Failed to setup MPU6050");
+    return;
+  }
+
+  // Setup RTC
+  if (!setupRTC()) {
+    Serial.println("[ERROR] :: Failed to setup RTC");
+    return;
+  }
+
+  // Setup Wifi
+  if (!setupWifi()) {
+    Serial.println("[ERROR] :: Failed to setup wifi");
+    return;
+  }
+
+  if (!setupSD()) {
+    Serial.println("[ERROR] :: Failed to setup SD Card");
+    return;
+  }
+
+  setupWebServer(); // Setup Web Server
+  setupInitVars(); // Initialise run-time vars
+  setupNotice(); // Ready to Go
+}
+/** SETUP :: End **/
+
 
 // void readSD() {
 //   String path = "/httpdocs/index.html";
@@ -128,29 +205,11 @@ String getDeviceUID() {
   return "TIMECUBE-" + String(ESP.getChipId());
 }
 
-void setupNotice() {
-  // Device ID
-  Serial.print("[NOTICE] :: Device UUID: ");
-  Serial.println(getDeviceUID());
-
-  // Search Duration Timeout
-  Serial.print("[NOTICE] :: We will make ");
-  Serial.print(searchDirectionTimeout);
-  Serial.println(" attempts to determine direction/orientation after recording start.");
-
-  // Ready To Go
-  blink(BUZZER, 2, 100);
-  Serial.println();
+String getDateTimeNow() {
+  DateTime now = rtc.now();
+  char buffer[] = "YYYY-MM-DDThh:mm:ss";
+  return now.toString(buffer);
 }
-
-// TODO Shake detection for start/top
-//      Buzzer to indicate start/stop
-
-// TODO Basic Web Server for device info & setup instructions
-
-// TODO Log to SD card
-
-// TODO Real Time Clock?
 
 void blink(uint8_t Pin, int Count, int Duration) {
   for (int i = 0; i < Count; i++) {
@@ -164,114 +223,109 @@ void blink(uint8_t Pin, int Count, int Duration) {
 void motionDetected() {
   if (isMotion || slack > 0) { return; }
 
+  Serial.print("[MOTION] Motion Detected... ");
   isMotion = true;
   slack = SLACK;
-
-  Serial.print("Motion Detected... ");
-  int timeout = 10;
 
   if (isRecording) {
     Serial.println("Stopping Recording");
     blink(BUZZER, 2, 150);
-
     // TODO Handle Stop Recording
-
-    delay(250);
     
   } else {
     Serial.println("Starting Recording");
     blink(BUZZER, 1, 300);
-
-    sensors_event_t a, g, temp;
-    String direction = "";
-
-    Serial.print("Direction");
-    while (direction == "" && searchDirectionTimeout > 0) {
-      delay(SEARCH_DIRECTION_INTERVAL);
-      searchDirectionTimeout--;
-
-      mpu.getEvent(&a, &g, &temp);
-      direction = getFace(a.acceleration.x, a.acceleration.y, a.acceleration.z);
-
-      Serial.print(".");
-    }
-
-    if (direction == "") {
-      Serial.println("Failed to detect direction after motion");
-      blink(BUZZER, 1, 2000);
-
-      isRecording = false;
-      isMotion = false;
-      slack = 0;
-
-      return;
-    }
-
-    
-    Serial.println(direction);
-    // TODO Log Start time
+    handleRecordingStart();
   }
 
   isRecording = !isRecording;
   isMotion = false;
+  delay(250);
 }
 
-void setup() {
-  Serial.begin(serialBaud);
+void handleRecordingStart() {
+  String direction = "";
+  sensors_event_t a, g, temp;
 
-  // Setup Buzzer
-  setupBuzzer();
+  // Poll for direction until found or timeout reached
+  Serial.print("[MOTION] Detecting Direction...");
+  while (direction == "" && searchDirectionTimeout > 0) {
+    mpu.getEvent(&a, &g, &temp);
+    direction = getFace(a.acceleration.x, a.acceleration.y, a.acceleration.z);
 
-  // Setup MPU6050 (Gyro)1
-  if (!setupMPU()) {
-    Serial.println("[ERROR] :: Failed to setup MPU6050");
-    return;
+    delay(SEARCH_DIRECTION_INTERVAL);
+    searchDirectionTimeout--;
+    Serial.print(".");
   }
 
-  // Setup Wifi
-  if (!setupWifi()) {
-    Serial.println("[ERROR] :: Failed to setup wifi");
+  // /* Print out the values */
+  // Serial.print("Acceleration X: ");
+  // Serial.print(a.acceleration.x);
+  // Serial.print(", Y: ");
+  // Serial.print(a.acceleration.y);
+  // Serial.print(", Z: ");
+  // Serial.print(a.acceleration.z);
+  // Serial.println(" m/s^2");
+
+  if (direction == "") {
+    Serial.println("Failed to detect direction after motion");
+    blink(BUZZER, 1, 2000);
+
+    isRecording = false;
+    isMotion = false;
+    slack = 0;
     return;
   }
-
-  // Setup Web Server
-  setupWebServer();
-
-  // Initialise
-  setupInitVars();
   
-  // // Setup SD Card
-  // if (!setupSD()) {
-  //   Serial.println("Failed to setup SD Card");
-  //   return;
-  // }
-  // readSD();
+  Serial.println(direction);
 
-  // Ready to Go
-  setupNotice();
+  // TODO Log Start
+  logStartRecording(direction);
+}
+
+bool logStartRecording(String face) {
+  File dataFile = SD.open(RECORDING_FILE, FILE_WRITE);
+
+  if (!dataFile) { 
+    Serial.print("[logStartRecording] Error opening");
+    Serial.println(RECORDING_FILE);
+    return false;
+  }
+
+  String dataString = ""; // UID,FACE,START,END
+  dataString += getDeviceUID(); dataString += ","; // Device UID
+  dataString += face; dataString += ","; // Face
+  dataString += getDateTimeNow(); dataString += ","; // Start Time
+  dataString += "null"; // End Time = null
+
+  dataFile.println(dataString);
+  dataFile.close();
+  Serial.println(dataString);
+
+  return true;
+}
+
+bool logStopRecording() {
+  File dataFile = SD.open(RECORDING_FILE, FILE_READ);
+
+  if (!dataFile) { 
+    Serial.print("[logStartRecording] Error opening");
+    Serial.println(RECORDING_FILE);
+    return false;
+  }
+
+  // TODO Close Recording Line
+  return true;
 }
 
 void loop() {
-  /* Listen for Web Requests */
-  webserver.handleClient(); 
-
   /* Look for Motion */
   if(mpu.getMotionInterruptStatus()) {
-    /* Get new sensor events with the readings */
     motionDetected();
-
-    // /* Print out the values */
-    // Serial.print("Acceleration X: ");
-    // Serial.print(a.acceleration.x);
-    // Serial.print(", Y: ");
-    // Serial.print(a.acceleration.y);
-    // Serial.print(", Z: ");
-    // Serial.print(a.acceleration.z);
-    // Serial.println(" m/s^2");
   }
 
   delay(100);
-  slack = max(slack - 1, 0);
+  slack = max(slack - 1, 0); // Slack acts like debounce to prevent multiple motion fire events from same motion.
 }
 
 /**
@@ -279,7 +333,7 @@ void loop() {
  */
 bool zeroThreshold(double val) {
   double absVal = fabs(val);
-  return (absVal >= 0 && absVal <= accelerationZeroThreshold);
+  return (absVal >= 0 && absVal <= ACCELERATION_ZERO_THRESHOLD);
 }
 
 String getFace(double x, double y, double z) {
