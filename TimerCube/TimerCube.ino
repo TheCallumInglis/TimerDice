@@ -16,6 +16,10 @@
 bool isRecording = false;
 int recordingID;
 char recordingFile[32];
+String recordingFace; // TODO Convert face numbering to int
+String currentFace;
+int faceSwitchCounter = 0;
+int faceSwitchThreshold = 5; // Seconds
 bool isMotion = false;
 int slack = 0;
 
@@ -32,11 +36,6 @@ HTTPClient http;
 WiFiClient client;
 ESP8266WebServer webserver(80);
 RTC_DS1307 rtc;
-
-char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
-
-// TODO Log to SD card
-// TODO Real Time Clock?
 
 /** SETUP :: Start **/
 bool setupWifi() {
@@ -58,9 +57,12 @@ bool setupWifi() {
   return true;
 }
 
-void setupBuzzer() {
+void setupIndicators() {
   pinMode(BUZZER, OUTPUT);
   digitalWrite(BUZZER, LOW);
+
+  pinMode(RECORDING_INDICATOR, OUTPUT);
+  digitalWrite(RECORDING_INDICATOR, LOW);
 }
 
 bool setupMPU() {
@@ -167,7 +169,7 @@ void setupNotice() {
 void setup() {
   Serial.begin(SERIAL_BAUD);
   
-  setupBuzzer(); // Setup Buzzer (Shut the thing up if pin is HIGH on boot)
+  setupIndicators(); // Setup Buzzer & other outputs (Shut the thing up if pin is HIGH on boot)
 
   // Setup MPU6050 (Gyro)1
   if (!setupMPU()) {
@@ -233,19 +235,30 @@ int getRandomTaskID() {
   return rand() % 100000 + 10000; // 10,000 - 100,000
 }
 
+/**
+ * Generate a unique recording file path
+ * Within RECORDING_DIR:
+ *    -> EPOCH-RAND.xml
+ */
 void getNewRecordingFilepath(char* outRecordingFile) {
-  char buffer[6]; // For Recording ID
+  char epochBuffer[32]; // For epoch
+  char idBuffer[6]; // For Recording ID
+  char filepath[64]; // New filepath
 
-  char filepath[32]; // New filepath
+  int epoch = rtc.now().unixtime();
+  sprintf(epochBuffer, "%d", epoch);
+
   strcpy(filepath, "");
 
   // Find unique filepath
   while (strlen(filepath) == 0 || SD.exists(filepath)) {
     recordingID = getRandomTaskID();
-    sprintf(buffer, "%d", recordingID);
+    sprintf(idBuffer, "%d", recordingID);
 
     strcpy(filepath, RECORDING_DIR);
-    strcat(filepath, buffer);
+    strcat(filepath, epochBuffer);
+    strcat(filepath, "-");
+    strcat(filepath, idBuffer);
     strcat(filepath, ".xml");
   }
 
@@ -256,7 +269,7 @@ void blink(uint8_t Pin, int Count, int Duration) {
   for (int i = 0; i < Count; i++) {
     digitalWrite(Pin, HIGH); 
     delay(Duration/2);
-    digitalWrite(BUZZER, LOW);
+    digitalWrite(Pin, LOW);
     delay(Duration/2);
   }
 }
@@ -269,18 +282,10 @@ void motionDetected() {
   slack = SLACK;
 
   if (isRecording) {
-    Serial.println("Stopping Recording");
-    blink(BUZZER, 2, 150);
     logStopRecording();
-    isRecording = false;
     
   } else {
-    Serial.println("Starting Recording");
-    blink(BUZZER, 1, 300);
-    delay(1000);
-    if (handleRecordingStart()) {
-      isRecording = true;
-    }
+    handleRecordingStart();
   }
 
   isMotion = false;
@@ -288,28 +293,21 @@ void motionDetected() {
 }
 
 bool handleRecordingStart() {
+  Serial.println("Starting Recording");
+  blink(BUZZER, 1, 300);
+  delay(1000); // Allow time to position cube
+
   String direction = "";
-  sensors_event_t a, g, temp;
 
   // Poll for direction until found or timeout reached
   Serial.print("[MOTION] Detecting Direction...");
   while (direction == "" && searchDirectionTimeout > 0) {
-    mpu.getEvent(&a, &g, &temp);
-    direction = getFace(a.acceleration.x, a.acceleration.y, a.acceleration.z);
+    direction = getFaceNow();
 
     delay(SEARCH_DIRECTION_INTERVAL);
     searchDirectionTimeout--;
     Serial.print(".");
   }
-
-  // /* Print out the values */
-  // Serial.print("Acceleration X: ");
-  // Serial.print(a.acceleration.x);
-  // Serial.print(", Y: ");
-  // Serial.print(a.acceleration.y);
-  // Serial.print(", Z: ");
-  // Serial.print(a.acceleration.z);
-  // Serial.println(" m/s^2");
 
   if (direction == "") {
     Serial.println("Failed to detect direction after motion");
@@ -320,13 +318,21 @@ bool handleRecordingStart() {
     slack = 0;
     return false;
   }
-  
   Serial.println(direction);
 
-  // TODO Log Start
-  return logStartRecording(direction);
+  //  Log Start
+  if(!logStartRecording(direction)) {
+    return false;
+  }
+
+  isRecording = true;
+  recordingFace = direction;
+  return true;
 }
 
+/**
+ * Write out recording logging to file
+ */
 bool logStartRecording(String face) {
   getNewRecordingFilepath(recordingFile);
 
@@ -352,11 +358,18 @@ bool logStartRecording(String face) {
   return true;
 }
 
+/**
+ * Close of a recording file.. we expect the filepath to exist
+ */
 bool logStopRecording() {
+  Serial.println("Stopping Recording");
+blink(BUZZER, 2, 150);
+    
   if (!SD.exists(recordingFile)) {
     Serial.print("[logStartRecording] Error opening (File does not exist): ");
     Serial.println(recordingFile);
     return false;
+    // TODO Maybe close off any "is recording" flags here...
   }
 
   File dataFile = SD.open(recordingFile, FILE_WRITE);
@@ -373,6 +386,8 @@ bool logStopRecording() {
   dataFile.println(dataString);
   dataFile.close();
   Serial.println(dataString);
+
+  isRecording = false;
   return true;
 }
 
@@ -382,7 +397,35 @@ void loop() {
     motionDetected();
   }
 
-  delay(100);
+  /* Check current face matches what we're recording */
+  String currentFace = getFaceNow();
+  if (isRecording && currentFace != "" && currentFace != recordingFace) {
+    faceSwitchCounter++;
+
+    // Wait a bit, check this is sensible
+    if (faceSwitchCounter > (faceSwitchThreshold * 1000) / LOOP_DELAY) {
+      Serial.println("Detect face switch! Moving to new face");
+      Serial.print("Old Face: "); Serial.println(recordingFace);
+      Serial.print("New Face: "); Serial.println(currentFace);
+
+      // Stop current recording
+      if (logStopRecording()) {
+        // Start new recording
+        if (!handleRecordingStart()) {
+          blink(BUZZER, 5, 200);
+        }
+      }
+
+      // TODO Handle checking that this worked
+
+      faceSwitchCounter = 0;
+    }
+  }
+
+  /* Recording in progress */
+  digitalWrite(RECORDING_INDICATOR, (isRecording ? HIGH : LOW)); 
+
+  delay(LOOP_DELAY);
   slack = max(slack - 1, 0); // Slack acts like debounce to prevent multiple motion fire events from same motion.
 }
 
@@ -392,6 +435,12 @@ void loop() {
 bool zeroThreshold(double val) {
   double absVal = fabs(val);
   return (absVal >= 0 && absVal <= ACCELERATION_ZERO_THRESHOLD);
+}
+
+String getFaceNow() {
+  sensors_event_t a, g, temp;
+  mpu.getEvent(&a, &g, &temp);
+  return currentFace = getFace(a.acceleration.x, a.acceleration.y, a.acceleration.z);
 }
 
 String getFace(double x, double y, double z) {
