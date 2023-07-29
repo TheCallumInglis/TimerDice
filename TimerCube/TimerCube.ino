@@ -9,6 +9,9 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include "RTClib.h"
+#include <WiFiUdp.h>
+#include <NTPClient.h>
+#include <TimeLib.h> 
 
 #include "config.h"
 
@@ -38,6 +41,8 @@ HTTPClient http;
 WiFiClient client;
 ESP8266WebServer webserver(80);
 RTC_DS1307 rtc;
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, NTPServer);
 
 /** SETUP :: Start **/
 bool setupWifi() {
@@ -97,15 +102,23 @@ bool setupRTC() {
   }
   Serial.println("Found!");
 
-  Serial.println("[RTC] :: Setting the time now..."); // TODO Set to current time (NTP?)
-  rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-  Serial.println("[RTC] :: Time has been set");
-
-  DateTime now = rtc.now();
-  Serial.print("[RTC] :: The Time is Now: ");
-  Serial.println(getDateTimeNow());
+  // Set the time with NTP server
+  timeClient.begin();
+  updateTime();
 
   return true;
+}
+
+void updateTime() {
+  timeClient.update();
+
+  Serial.println("[RTC] :: Setting the time now...");
+  unsigned long unix_epoch = timeClient.getEpochTime();  // Get epoch time
+  rtc.adjust(DateTime(unix_epoch));  // Set RTC time using NTP epoch time
+  Serial.println("[RTC] :: Time has been set");
+
+  Serial.print("[RTC] :: The Time is Now: ");
+  Serial.println(getDateTimeNow());
 }
 
 bool setupSD() {
@@ -179,12 +192,6 @@ void setup() {
     return;
   }
 
-  // Setup RTC
-  if (!setupRTC()) {
-    Serial.println("[ERROR] :: Failed to setup RTC");
-    return;
-  }
-
   // Setup Wifi
   if (!setupWifi()) {
     Serial.println("[ERROR] :: Failed to setup wifi");
@@ -193,6 +200,12 @@ void setup() {
 
   if (!setupSD()) {
     Serial.println("[ERROR] :: Failed to setup SD Card");
+    return;
+  }
+
+  // Setup RTC
+  if (!setupRTC()) {
+    Serial.println("[ERROR] :: Failed to setup RTC");
     return;
   }
 
@@ -279,6 +292,7 @@ void blink(uint8_t Pin, int Count, int Duration) {
 void motionDetected() {
   if (isMotion || slack > 0) { return; }
 
+  updateTime(); // is this excessive?
   Serial.print("[MOTION] Motion Detected... ");
   isMotion = true;
   slack = SLACK;
