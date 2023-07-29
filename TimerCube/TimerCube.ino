@@ -16,8 +16,10 @@
 bool isRecording = false;
 int recordingID;
 char recordingFile[32];
-String recordingFace; // TODO Convert face numbering to int
-String currentFace;
+
+int recordingFace;
+int currentFace;
+
 int faceSwitchCounter = 0;
 int faceSwitchThreshold = 5; // Seconds
 bool isMotion = false;
@@ -297,19 +299,19 @@ bool handleRecordingStart() {
   blink(BUZZER, 1, 300);
   delay(1000); // Allow time to position cube
 
-  String direction = "";
+  int face = -1;
 
   // Poll for direction until found or timeout reached
   Serial.print("[MOTION] Detecting Direction...");
-  while (direction == "" && searchDirectionTimeout > 0) {
-    direction = getFaceNow();
+  while (face == -1 && searchDirectionTimeout > 0) {
+    face = getFaceNow();
 
     delay(SEARCH_DIRECTION_INTERVAL);
     searchDirectionTimeout--;
     Serial.print(".");
   }
 
-  if (direction == "") {
+  if (face == -1) {
     Serial.println("Failed to detect direction after motion");
     blink(BUZZER, 1, 2000);
 
@@ -318,22 +320,22 @@ bool handleRecordingStart() {
     slack = 0;
     return false;
   }
-  Serial.println(direction);
+  Serial.println(face);
 
   //  Log Start
-  if(!logStartRecording(direction)) {
+  if(!logStartRecording(face)) {
     return false;
   }
 
   isRecording = true;
-  recordingFace = direction;
+  recordingFace = face;
   return true;
 }
 
 /**
  * Write out recording logging to file
  */
-bool logStartRecording(String face) {
+bool logStartRecording(int face) {
   getNewRecordingFilepath(recordingFile);
 
   File dataFile = SD.open(recordingFile, FILE_WRITE);
@@ -398,8 +400,8 @@ void loop() {
   }
 
   /* Check current face matches what we're recording */
-  String currentFace = getFaceNow();
-  if (isRecording && currentFace != "" && currentFace != recordingFace) {
+  int currentFace = getFaceNow();
+  if (isRecording && currentFace != -1 && currentFace != recordingFace) {
     faceSwitchCounter++;
 
     // Wait a bit, check this is sensible
@@ -429,62 +431,47 @@ void loop() {
   slack = max(slack - 1, 0); // Slack acts like debounce to prevent multiple motion fire events from same motion.
 }
 
-/**
- * Returns true when value can be considered 0
- */
-bool zeroThreshold(double val) {
-  double absVal = fabs(val);
-  return (absVal >= 0 && absVal <= ACCELERATION_ZERO_THRESHOLD);
+bool fuzzyComp(double value, double threshold) {
+  return (value >= (threshold - ACCELERATION_ZERO_THRESHOLD) && value <= (threshold + ACCELERATION_ZERO_THRESHOLD));
 }
 
-String getFaceNow() {
+int getFaceNow() {
   sensors_event_t a, g, temp;
   mpu.getEvent(&a, &g, &temp);
   return currentFace = getFace(a.acceleration.x, a.acceleration.y, a.acceleration.z);
 }
 
-String getFace(double x, double y, double z) {
-  String face;
-  // 6-Sides
-
-  //                X.    Y.    Z. 
-  // Up             0     0     10      Z
-  // Upsidedown     0     0     -10
-
-  // Left           10    0     0       X
-  // Right          -10   0     0
-
-  // Nose           0     -10   0       Y
-  // Tail           0     10    0
-
-  // Z
-  if (zeroThreshold(x) && zeroThreshold(y)) {
-    if (z > 0) {
-      face = "Up";
-    } else {
-      face = "Upsidedown";
-    }
-  }
-
+int getFace(double x, double y, double z) {
   // X
-  if (zeroThreshold(y) && zeroThreshold(z)) {
-    if (x > 0) {
-      face = "left";
-    } else {
-      face = "right";
+  if (fuzzyComp(x, -9.8)) { // X roughly -9.8
+    if (y < 0) { return 6; } else { return 11; }
+  }
+
+  if (fuzzyComp(x, -4.5)) { // X roughly -4.5
+    if (y < 0) { return 5; } else { return 7; }
+  }
+  
+  if (fuzzyComp(x, 0.0)) { // X roughly 0
+    if (fuzzyComp(y, -9.8)) {
+      return 1;
+    } else if (fuzzyComp(y, -4.5)) {
+      return 2;
+    } else if (fuzzyComp(y,  4.5)) {
+      return 10;
+    } else if (fuzzyComp(y,  9.0)) {
+      return 12;
     }
   }
 
-  // Y
-  if (zeroThreshold(x) && zeroThreshold(z)) {
-    if (y > 0) {
-      face = "tail";
-    } else {
-      face = "nose";
-    }
+  if (fuzzyComp(x, 4.5)) { // X roughly 4.5
+    if (y < 0) { return 4; } else { return 8; }
   }
 
-  return face;
+  if (fuzzyComp(x, 9.8)) { // X roughly 9.8 
+    if (y < 0) { return 3; } else { return 9; }
+  }
+
+  return -1; // We broke it!
 }
 
 void startRecordingTask(char* faceName) {
