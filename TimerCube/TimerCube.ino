@@ -95,7 +95,7 @@ bool setupRTC() {
   }
   Serial.println("Found!");
 
-  Serial.println("[RTC] :: Setting the time now...");
+  Serial.println("[RTC] :: Setting the time now..."); // TODO Set to current time (NTP?)
   rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
   Serial.println("[RTC] :: Time has been set");
 
@@ -363,7 +363,7 @@ bool logStartRecording(String face) {
  */
 bool logStopRecording() {
   Serial.println("Stopping Recording");
-blink(BUZZER, 2, 150);
+  blink(BUZZER, 2, 150);
     
   if (!SD.exists(recordingFile)) {
     Serial.print("[logStartRecording] Error opening (File does not exist): ");
