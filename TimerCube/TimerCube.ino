@@ -12,6 +12,7 @@
 #include <WiFiUdp.h>
 #include <NTPClient.h>
 #include <TimeLib.h> 
+#include <PubSubClient.h> // MQTT Library: https://pubsubclient.knolleary.net/api
 
 #include "config.h"
 
@@ -43,6 +44,11 @@ ESP8266WebServer webserver(80);
 RTC_DS1307 rtc;
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, NTPServer);
+PubSubClient mqttClient(client); // Rabbit MQ
+unsigned long lastMsg = 0;
+#define MSG_BUFFER_SIZE	(256)
+char msg[MSG_BUFFER_SIZE];
+int value = 0;
 
 /** SETUP :: Start **/
 bool setupWifi() {
@@ -209,32 +215,15 @@ void setup() {
     return;
   }
 
+  // Setup MQTT
+  mqttClient.setServer(MQTT_URL, 1883);
+
   setupWebServer(); // Setup Web Server
   setupInitVars(); // Initialise run-time vars
   setupNotice(); // Ready to Go
 }
 /** SETUP :: End **/
 
-
-// void readSD() {
-//   String path = "/httpdocs/index.html";
-//   myFile = SD.open(path);
-//   if (myFile) {
-//     Serial.println(path);
-
-//     // read from the file until there's nothing else in it:
-//     while (myFile.available()) {
-//       Serial.write(myFile.read());
-//     }
-//     // close the file:
-//     myFile.close();
-
-//   } else {
-//     // if the file didn't open, print an error:
-//     Serial.print("error opening ");
-//     Serial.println(path);
-//   }
-// }
 
 String getDeviceUID() {
   return "TIMECUBE-" + String(ESP.getChipId());
@@ -403,6 +392,30 @@ bool logStopRecording() {
   dataFile.close();
   Serial.println(dataString);
 
+  // Publish to MQTT Recording Finished
+  dataFile = SD.open(recordingFile, FILE_READ);
+  if (dataFile) {
+
+    // Read until nothing left
+    String fileContent;
+    while (dataFile.available()) { 
+      fileContent += dataFile.readStringUntil('\r');
+    }
+    dataFile.close();
+
+    // Publish to MQTT
+    String topic = "timer_mqtt/"; topic += recordingFile; // Append recording file path to the topic
+
+    if (mqttClient.publish(topic.c_str(), fileContent.c_str())) {
+      Serial.println("Msg Sent!");
+      // TODO Archive recording file
+
+    } else {
+      Serial.println("Failed to send msg");
+      // TODO Handle a failed to send msg
+    }
+  }
+
   isRecording = false;
   return true;
 }
@@ -412,6 +425,13 @@ void loop() {
   if(mpu.getMotionInterruptStatus()) {
     motionDetected();
   }
+
+  /* MQTT */
+  if (!mqttClient.connected()) {
+    Serial.println("MQTT Client is not connected!");
+    reconnect();
+  }
+  mqttClient.loop(); // Maintain MQTT Connection
 
   /* Check current face matches what we're recording */
   int currentFace = getFaceNow();
@@ -507,6 +527,25 @@ void startRecordingTask(char* faceName) {
 
 void stopRecordingTask() {
   // TODO
+}
+
+/** MQTT **/
+void reconnect() {
+  // Loop until we're reconnected
+  while (!mqttClient.connected()) {
+    Serial.print("Attempting MQTT connection...");
+
+    // Attempt to connect
+    if (mqttClient.connect(getDeviceUID().c_str(), MQTT_USER, MQTT_PASS)) {
+      Serial.println("connected");
+
+    } else {
+      Serial.print("failed, rc=");
+      Serial.print(mqttClient.state());
+      Serial.println(" try again in 5 seconds");
+      delay(5000);
+    }
+  }
 }
 
 /** HTTP Server **/
