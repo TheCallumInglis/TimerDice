@@ -1,5 +1,8 @@
-<deviceUID>TIMECUBE-6716273</deviceUID>
-<recordingID>62976</recordingID>
-<face>10</face>
-<start>2023-07-29T21:37:44</start>
-<end>2023-07-29T21:37:49</end>
+<?xml version='1.0' encoding='UTF-8'?>
+<root>
+    <deviceUID>TIMECUBE-6716273</deviceUID>
+    <recordingID>18432</recordingID>
+    <face>1</face>
+    <start>2023-07-30T21:09:47</start>
+    <end>2023-07-30T21:09:56</end>
+</root>

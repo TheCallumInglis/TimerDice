@@ -1,29 +1,48 @@
-import pika
+from config import DATABASE_URI
+from models import Base, Recording
+from consumer import Consumer
 
-_queue = 'timer_amqp'
-print(' Connecting to server ...')
+import pprint
 
-try:
-    credentials = pika.PlainCredentials('user', 'password')
-    connection = pika.BlockingConnection(pika.ConnectionParameters(host="rabbitmq", credentials=credentials))
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from contextlib import contextmanager
 
-except pika.exceptions.AMQPConnectionError as exc:
-    print("Failed to connect to RabbitMQ service. Message wont be sent.")
-    exit(0)
+pp = pprint.PrettyPrinter(indent=4)
+engine = create_engine(DATABASE_URI)
+Session = sessionmaker(bind=engine)
 
-channel = connection.channel()
-channel.queue_declare(queue=_queue, durable=True)
+@contextmanager
+def session_scope():
+    session = Session()
+    try:
+        yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
 
-print(' Waiting for messages...')
+def recreate_database():
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
 
-
-def callback(ch, method, properties, body):
+def mq_callback(ch, method, properties, body):
     print(" Received a message!")
-    print("%s" % body.decode())
-    print(" Done")
 
-    ch.basic_ack(delivery_tag=method.delivery_tag)
+    recording = Recording(body.decode())
+    pp.pprint(recording)
 
-channel.basic_qos(prefetch_count=1)
-channel.basic_consume(queue=_queue, on_message_callback=callback)
-channel.start_consuming()
+    with session_scope() as sesh:
+        try:
+            sesh.add(recording)
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+
+        except Exception as e:
+            print('that didnt work %r' % (e))
+
+
+
+if __name__ == "__main__":
+    consumer = Consumer(mq_callback)
