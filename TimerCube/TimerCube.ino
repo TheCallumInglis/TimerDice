@@ -13,6 +13,7 @@
 #include <NTPClient.h>
 #include <TimeLib.h> 
 #include <PubSubClient.h> // MQTT Library: https://pubsubclient.knolleary.net/api
+                          // With help from https://funprojects.blog/2018/12/07/rabbitmq-for-iot/
 
 #include "config.h"
 
@@ -45,10 +46,6 @@ RTC_DS1307 rtc;
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, NTPServer);
 PubSubClient mqttClient(client); // Rabbit MQ
-unsigned long lastMsg = 0;
-#define MSG_BUFFER_SIZE	(256)
-char msg[MSG_BUFFER_SIZE];
-int value = 0;
 
 /** SETUP :: Start **/
 bool setupWifi() {
@@ -398,14 +395,17 @@ bool logStopRecording() {
 
     // Read until nothing left
     String fileContent;
+    fileContent += "<root>\n";
     while (dataFile.available()) { 
       fileContent += dataFile.readStringUntil('\r');
     }
+    fileContent += "</root>";
     dataFile.close();
 
     // Publish to MQTT
     String topic = "timer_mqtt/"; topic += recordingFile; // Append recording file path to the topic
 
+    Serial.println(fileContent);
     if (mqttClient.publish(topic.c_str(), fileContent.c_str())) {
       Serial.println("Msg Sent!");
       // TODO Archive recording file
