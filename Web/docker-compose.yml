@@ -18,6 +18,7 @@ services:
 
   database:
     image: postgres
+    hostname: postgres
     restart: always
     environment:
       POSTGRES_PASSWORD: password
