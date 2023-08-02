@@ -78,7 +78,7 @@ def mq_callback(ch, method, properties, body):
         
         print("Task Found! %r" % task)
 
-        # TODO Get User
+        # Get User
         userDice:UserDice = sesh.query(UserDice).filter_by(Dice = dice.DiceID).first()
         if (userDice == None):
             print("No user assigned to dice")
@@ -94,22 +94,7 @@ def mq_callback(ch, method, properties, body):
         # All Done, Ack the message
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
-
-    # recording = Recording(body.decode())
-    # pp.pprint(recording)
-
-    # with session_scope() as sesh:
-    #     try:
-    #         sesh.add(recording)
-    #         ch.basic_ack(delivery_tag=method.delivery_tag)
-
-    #     except Exception as e:
-    #         print('that didnt work %r' % (e))
-
-
-
 if __name__ == "__main__":
     recreate_database()
-
     consumer = Consumer(mq_callback)
     
