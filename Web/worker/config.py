@@ -1,6 +1,6 @@
-DATABASE_URI = 'postgresql+psycopg2://postgres:password@localhost/postgres'
+DATABASE_URI = 'postgresql+psycopg2://postgres:password@postgres/postgres'
 
-MQ_HOST = 'localhost'
+MQ_HOST = 'rabbitmq'
 MQ_USER = 'user'
 MQ_PASS = 'password'
 MQ_QUEUE = 'timer_amqp'
