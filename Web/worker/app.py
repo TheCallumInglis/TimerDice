@@ -1,15 +1,17 @@
-from config import DATABASE_URI
-from models import Base, Dice, DiceFace, TaskType, Tasks, Organisation, User, UserDice, DiceFaceTask, DiceRecording, Recording, APIKey
+from config import *
+from models import *
 from consumer import Consumer
+from web import *
 
-import pprint
+from pprint import PrettyPrinter
+from multiprocessing import Process
 
 ## Note: sqlalchemy is installed by running "pip install psycopg2-binary"
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from contextlib import contextmanager
 
-pp = pprint.PrettyPrinter(indent=4)
+pp = PrettyPrinter(indent=4)
 engine = create_engine(DATABASE_URI)
 Session = sessionmaker(bind=engine)
 
@@ -94,7 +96,24 @@ def mq_callback(ch, method, properties, body):
         # All Done, Ack the message
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
+class WebServer():
+    def run(self):
+        webapp.run(debug=WEB_DEBUG, host='0.0.0.0', port=WEB_PORT)
+
 if __name__ == "__main__":
     recreate_database()
-    consumer = Consumer(mq_callback)
-    
+
+    subscriber_list = []
+    subscriber_list.append(WebServer())
+    subscriber_list.append(Consumer(mq_callback))
+
+    # execute
+    process_list = []
+    for sub in subscriber_list:
+        process = Process(target=sub.run)
+        process.start()
+        process_list.append(process)
+
+    # wait for finish
+    for process in process_list:
+        process.join()
