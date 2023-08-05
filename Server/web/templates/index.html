@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <h1>{% block title %} Welcome to Timer Cube {% endblock %}</h1>
+    
+    <h2>Task Effort Tracker</h2>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Task ID</th>
+                <th>Type</th>
+                <th>Organisation</th>
+                <th>Task Name</th>
+                <th>Effort</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for task in tasks %}
+                <tr>
+                    <td>{{ task['taskid'] }}</td>
+                    <td>{{ task['tasktype'] }}</td>
+                    <td>{{ task['organisation'] }}</td>
+                    <td>{{ task['name'] }}</td>
+                    <td>{{ task['spendtime'] }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2>Dice-Face-Task Tracker</h2>
+    <table class="table">
+        <thead>
+            <tr>
+                <th colspan="4">Dice</th>
+                <th colspan="2">User</th>
+                <th colspan="4">Task</th>
+            </tr>
+            <tr>
+                <th>ID</th>
+                <th>UUID</th>
+                <th>Name</th>
+                <th>Num. Faces</th>
+
+                <th>Name</th>
+                <th>Organisation</th>
+
+                <th>Face Num.</th>
+                <th>Task ID</th>
+                <th>Task Name</th>
+                <th>Task Type</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for dicetask in dicetasks %}
+            <tr>
+                <td>{{ dicetask['diceid'] }}</td>
+                <td>{{ dicetask['uuid'] }}</td>
+                <td>{{ dicetask['name'] }}</td>
+                <td>{{ dicetask['faces'] }}</td>
+
+                <td>{{ dicetask['username'] }}</td>
+                <td>{{ dicetask['organisation'] }}</td>
+
+                <td>{{ dicetask['facenumber'] }}</td>
+                <td>{{ dicetask['taskid'] }}</td>
+                <td>{{ dicetask['taskname'] }}</td>
+                <td>{{ dicetask['tasktype'] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+{% endblock %}

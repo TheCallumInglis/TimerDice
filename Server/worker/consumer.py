@@ -21,3 +21,4 @@ class Consumer:
         self.channel.start_consuming()
 
         print(' Waiting for messages...')
+        
