@@ -5,9 +5,6 @@ RUN apt-get update -y && \
 
 RUN pip3 install pika && \
     pip3 install xmltodict && \
-    pip3 install SQLAlchemy && \
-    pip3 install psycopg2-binary && \
-    pip3 install flask && \
     pip3 install requests
 
 WORKDIR /app

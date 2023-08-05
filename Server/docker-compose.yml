@@ -29,10 +29,18 @@ services:
 
   worker:
     build: worker
-    ports:
-      - 8080:8080
     volumes:
       - ./worker:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+
+  web:
+    build: web
+    hostname: timercube
+    ports:
+      - 5001:5001
+    volumes:
+      - ./web:/web
     environment:
       - PYTHONUNBUFFERED=1
 
