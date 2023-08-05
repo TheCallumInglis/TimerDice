@@ -3,31 +3,43 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="{{ url_for('static', filename= 'css/style.css') }}">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-4bw+/aepP/YC94hEpVNVgiZdgIC5+VKNBQNGCHeKRQN+PtmoHDEXuppvnDJzQIu9" crossorigin="anonymous">
 
     <title>{% block title %} {% endblock %}</title>
   </head>
   <body data-bs-theme="dark">
     <!-- Nav Start-->
-    <nav class="navbar navbar-expand-md navbar-light bg-dark">
-        <a class="navbar-brand" href="{{ url_for('index')}}">Timer Cube</a>
-        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav">
-            <li class="nav-item active">
-                <a class="nav-link" href="#">About</a>
-            </li>
-            </ul>
+    <header class="d-flex flex-wrap align-items-center justify-content-center justify-content-md-between py-3 mb-4 border-bottom">
+      <div class="container">
+        <div class="row">
+          <div class="col-md-3 mb-2 mb-md-0">
+            <a href="/" class="d-inline-flex link-body-emphasis text-decoration-none">
+              <span class="fs-4">Timer Cube</span>
+            </a>
+          </div>
+
+          <ul class="nav col-12 col-md-6 col-md-auto mb-2 justify-content-center mb-md-0">
+            <li><a href="/" class="nav-link px-2">Home</a></li>
+            <li><a href="/dice" class="nav-link px-2">Dice</a></li>
+            <li><a href="#" class="nav-link px-2">Tasks</a></li>
+            <li><a href="#" class="nav-link px-2">Users</a></li>
+            <li><a href="#" class="nav-link px-2">About</a></li>
+          </ul>
+
+          <div class="col-md-3 col-sm-12 text-end">
+            <button type="button" class="btn btn-outline-warning me-2">Login</button>
+          </div>
         </div>
-    </nav>
+      </div>
+    </header>
     <!-- Nav End-->
 
     <div class="container">
         {% block content %} {% endblock %}
     </div>
 
+    <script src="{{ url_for('static', filename= 'script/timer.js') }}"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js" integrity="sha384-HwwvtgBNo3bZJJLYd8oVXjrBZt8cqVSpeBNS5n7C8IVInixGAoxmnlMuBnhbgrkm" crossorigin="anonymous"></script>
   </body>
 </html>
