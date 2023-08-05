@@ -27,24 +27,19 @@ def mq_callback(channel, method, properties, body):
     uri = API_URL + '/recording'
     try:
         response = requests.post(uri, json=json.dumps(dice_recording.__dict__), timeout=30)
+        pp.pprint(response.status_code)
+
+        if response.status_code != 200:
+            pp.pprint(response.text)
+            channel.basic_nack(delivery_tag=method.delivery_tag)
+            return
+
+        channel.basic_ack(delivery_tag=method.delivery_tag)
+        
     except requests.Timeout:
         channel.basic_nack(delivery_tag=method.delivery_tag)
     except requests.ConnectionError:
         channel.basic_nack(delivery_tag=method.delivery_tag)
-
-    pp.pprint(response.status_code)
-    if response.status_code != 200:
-        pp.pprint(response.text)
-        channel.basic_nack(delivery_tag=method.delivery_tag)
-        return
-
-    if response.apparent_encoding != 'application/json':
-        pp.pprint(response.text)
-        channel.basic_nack(delivery_tag=method.delivery_tag)
-        return
-
-    pp.pprint(response.json())
-    channel.basic_ack(delivery_tag=method.delivery_tag)
 
 if __name__ == "__main__":
     pp = PrettyPrinter(indent=4)
