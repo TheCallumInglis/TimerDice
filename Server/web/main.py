@@ -38,6 +38,10 @@ def recreate_database():
 def index():
     return render_template('index.html', tasks=get_efforts(), dicetasks=get_dice_face_tasks())
 
+@app.route('/dice')
+def dice():
+    return render_template('dice.html')
+
 @app.route('/api/recording', methods=['GET', 'POST'])
 def api_recording():
     """ API Method: Start/End or Get a recording"""
