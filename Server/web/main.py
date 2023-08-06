@@ -10,7 +10,7 @@ from contextlib import contextmanager
 
 from config import *
 from models import *
-from flask import Flask, render_template, request, Response
+from flask import Flask, render_template, request, Response, make_response, jsonify
 
 app = Flask(__name__)
 pp = PrettyPrinter(indent=4)
@@ -40,7 +40,118 @@ def index():
 
 @app.route('/dice')
 def dice():
-    return render_template('dice.html')
+    return render_template('dice.html', dice=get_dice())
+
+@app.route('/api/dice', methods=['GET', 'POST'])
+@app.route('/api/dice/<dice_id>', methods=['GET'])
+def api_dice(dice_id = None):
+    """ API Method: Create or Get a Dice"""
+    if request.method == 'GET':
+        if dice_id is None:
+            js_list = []
+            for dice in get_dice():
+                js_list.append(dice.to_dict())
+
+            return make_response({ "dice" : js_list })
+        
+        else:
+            # TODO Return specific dice by its ID
+            with session_scope() as db:
+                this_dice = db.query(Dice).filter(Dice.diceid == dice_id).first()
+
+                dice_faces = []
+                for face in db.query(vw_assignedtasks).filter(vw_assignedtasks.diceid == dice_id).order_by(vw_assignedtasks.facenumber).all():
+                    dice_faces.append(face.to_dict())
+
+                db.close()
+                return make_response({ "dice" : this_dice.to_dict(), "faces" : dice_faces })
+
+    elif request.method == 'POST' and request.mimetype == 'multipart/form-data':
+        # TODO Error Handling
+        new_dice = Dice(request.form['dice-uuid'], request.form['nickname'], request.form['faces'])
+
+        try:
+            with session_scope() as db:
+                # Check dice does not already exist
+                if db.query(Dice).filter(Dice.uuid == new_dice.uuid).count() > 0:
+                    return Response('Duplicate UUID', 409)
+                
+                # Create New Dice
+                db.add(new_dice)
+                new_dice:Dice = db.query(Dice).filter(Dice.uuid == new_dice.uuid).first()
+
+                # Create Dice Faces
+                for facenumber in range(0, int(new_dice.faces)):
+                    new_face:DiceFace = DiceFace(new_dice, facenumber + 1)
+                    db.add(new_face)
+
+                # Assign Dice to Default User
+                user_dice:UserDice = UserDice(1, new_dice)
+                db.add(user_dice)
+
+                return Response(new_dice.to_json(), 200)
+
+        except Exception as exception:
+            print("Hit Exception: %r" % exception)
+            return Response('Server Error', 503)
+    
+    return Response(405) # Not Allowed
+
+@app.route('/api/tasks/available/<dice_id>', methods=['GET'])
+def api_tasks_available(dice_id = None):
+    if dice_id is None:
+        return Response(400)
+    
+    # Get Tasks not arleady assigned to this dice
+    with session_scope() as db:
+        assigned_tasks = db.query(vw_assignedtasks.taskid).filter(
+            vw_assignedtasks.diceid == dice_id,
+            vw_assignedtasks.taskid.is_not(None)
+        ).all()
+
+        print([i[0] for i in assigned_tasks])
+
+        tasks = []
+        for task in db.query(Tasks).filter(Tasks.taskid.not_in([i[0] for i in assigned_tasks])).all():
+            tasks.append(task.to_dict())
+
+        return make_response({ "tasks" : tasks })
+
+@app.route('/api/tasks/assign', methods=['POST'])
+def api_tasks_assign():
+    """ API Method: Assign Task To Dice Face"""
+    pp.pprint(request)
+
+    if request.method == 'POST' and request.mimetype == 'multipart/form-data':
+        diceface:DiceFace = get_dice_face(request.form['diceid'], request.form['facenumber'])
+        task:Tasks = get_task(request.form['taskid'])
+
+        if diceface is None:
+            return Response('Dice Face Not Found', 404)
+        
+        if task is None:
+            return Response('Task Not Found', 404)
+
+        #try:
+        with session_scope() as db:
+            # TODO Check this task isn't assigned to another face on this dice
+            # return Response('Duplicate Task Assignment', 409)
+
+            # Check there isn't a task assigned to this face already
+            dicefacecheck = db.query(DiceFaceTask).filter(DiceFaceTask.diceface == diceface.dicefaceid)
+            if dicefacecheck.count() > 0:
+                for dfc in dicefacecheck.all(): # Remove existing assignment
+                    db.delete(dfc)
+
+            # Create Assignment   
+            assignment = DiceFaceTask(diceface, task)             
+            db.add(assignment)
+
+            return Response(assignment.to_json(), 200)
+
+        # except Exception as exception:
+        #     print("Hit Exception: %r" % exception)
+        #     return Response('Server Error', 503)
 
 @app.route('/api/recording', methods=['GET', 'POST'])
 def api_recording():
@@ -52,32 +163,42 @@ def api_recording():
         dice_recording:DiceRecording = json.loads(request.json, object_hook=lambda d: SimpleNamespace(**d))
         return create_recording(dice_recording)
 
-    else:
-        return Response(405) # Not Allowed
+    return Response(405) # Not Allowed
 # Web Routes End
 
 # Controller Start
-def get_efforts():
-    efforts = []
+def get_dice():
+    with session_scope() as db:
+        dice = db.query(Dice).order_by(Dice.uuid).all()
+        db.close()
+        return dice
 
+def get_efforts():
     with session_scope() as db:
         efforts = db.query(vw_taskspend).all()
         for effort in efforts:
             effort.spend_time_pretty()
         db.close()
-
-    return efforts
+        return efforts
 
 def get_dice_face_tasks():
-    dft = []
-
     with session_scope() as db:
         dft = db.query(vw_assignedtasks).filter(vw_assignedtasks.taskid.isnot(None)).order_by(vw_assignedtasks.diceid)
         db.close()
-
-    return dft
+        return dft
+    
+def get_dice_face(dice_id, face_number):
+    with session_scope() as db:
+        df = db.query(DiceFace).filter(DiceFace.dice == dice_id, DiceFace.facenumber == face_number).first()
+        db.close()
+        return df
+    
+def get_task(task_id):
+    with session_scope() as db:
+        task = db.query(Tasks).filter(Tasks.taskid == task_id).first()
+        db.close()
+        return task
         
-
 def create_recording(dice_recording:DiceRecording):
     """ Create A Dice Recording, consume dice_recording"""
     with session_scope() as db:

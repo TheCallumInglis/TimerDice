@@ -8,7 +8,7 @@ INSERT INTO "user" (organisation, "name") VALUES (
 INSERT INTO dice (uuid, "name", faces) VALUES (
 	 'TIMECUBE-6716273'
     ,'Test Dice 1'
-    ,6
+    ,12
 );
 
 INSERT INTO diceface (dice, facenumber) VALUES
