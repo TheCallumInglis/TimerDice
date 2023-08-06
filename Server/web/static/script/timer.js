@@ -96,9 +96,15 @@ const Timer = {
     DiceDetailModal: async (diceid) => {
         "use strict";
 
+        Timer.lblDiceFaceModalUUID.innerText = "";
         Timer.diceFaceTable.innerHTML = "";
+        
         let response = await fetch("/api/dice/" + diceid);
         let result = await response.json();
+
+        if (result['dice']) {
+            Timer.lblDiceFaceModalUUID.innerText = result['dice']['uuid'];
+        }
 
         for (let face in result['faces']) {
             let assignTaskLink = (result['faces'][face]['taskname'] == null) ? 'Assign Task' : 'Change';
