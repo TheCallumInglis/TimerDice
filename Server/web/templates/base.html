@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="h-100">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
@@ -8,7 +8,8 @@
 
     <title>{% block title %} {% endblock %}</title>
   </head>
-  <body data-bs-theme="dark">
+  
+  <body class="d-flex flex-column h-100" data-bs-theme="dark">
     <!-- Nav Start-->
     <header class="d-flex flex-wrap align-items-center justify-content-center justify-content-md-between py-3 mb-4 border-bottom">
       <div class="container">
@@ -24,7 +25,7 @@
             <li><a href="/dice" class="nav-link px-2">Dice</a></li>
             <li><a href="/tasks" class="nav-link px-2">Tasks</a></li>
             <li><a href="#" class="nav-link px-2">Users</a></li>
-            <li><a href="#" class="nav-link px-2">About</a></li>
+            <li><a href="/about" class="nav-link px-2">About</a></li>
           </ul>
 
           <div class="col-md-3 col-sm-12 text-end">
@@ -35,9 +36,18 @@
     </header>
     <!-- Nav End-->
 
-    <div class="container">
+    <main class="flex-shrink-0">
+      <div class="container">
         {% block content %} {% endblock %}
-    </div>
+      </div>
+    </main>
+    
+    <footer class="footer mt-auto py-3">
+      <div class="container">
+        <div class="border-bottom pb-3 mb-3"></div>
+        <p class="text-center text-body-secondary">&copy; {{ year }} <a href="https://www.calluminglis.com">Callum Inglis</a> | <a href="https://www.4oh4.co.uk">4oh4 Ltd</a></p>
+      </div>
+    </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js" integrity="sha384-HwwvtgBNo3bZJJLYd8oVXjrBZt8cqVSpeBNS5n7C8IVInixGAoxmnlMuBnhbgrkm" crossorigin="anonymous"></script>
     <script src="{{ url_for('static', filename= 'script/timer.js') }}"></script>
