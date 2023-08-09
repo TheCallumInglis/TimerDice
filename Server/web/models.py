@@ -1,8 +1,8 @@
+from datetime import timedelta
+import json
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, UUID, Integer, String, DateTime, Double, PrimaryKeyConstraint
 from sqlalchemy_serializer import SerializerMixin
-from datetime import timedelta
-import json
 
 Base = declarative_base()
 
@@ -103,10 +103,6 @@ class UserDice(Base, CustomSerializerMixin):
     userdiceid = Column(Integer, primary_key=True)
     user = Column(Integer)
     dice = Column(Integer)
-
-    def __init(self, user:User, dice:Dice):
-        self.user = user.userid
-        self.dice = dice.diceid
 
     def __init__(self, user_id:int, dice:Dice):
         self.user = user_id

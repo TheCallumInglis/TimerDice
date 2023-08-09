@@ -4,13 +4,13 @@ from types import SimpleNamespace
 from pprint import PrettyPrinter
 
 ## Note: sqlalchemy is installed by running "pip install psycopg2-binary"
+from contextlib import contextmanager
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from contextlib import contextmanager
 
 from config import *
 from models import *
-from flask import Flask, render_template, request, Response, make_response, jsonify
+from flask import Flask, render_template, request, Response, make_response
 
 app = Flask(__name__)
 pp = PrettyPrinter(indent=4)
@@ -57,14 +57,16 @@ def api_dice(dice_id = None):
                 js_list.append(dice.to_dict())
 
             return make_response({ "dice" : js_list })
-        
+
         else:
-            # TODO Return specific dice by its ID
+            # Return specific dice by its ID
             with session_scope() as db:
                 this_dice = db.query(Dice).filter(Dice.diceid == dice_id).first()
 
                 dice_faces = []
-                for face in db.query(vw_assignedtasks).filter(vw_assignedtasks.diceid == dice_id).order_by(vw_assignedtasks.facenumber).all():
+                for face in db.query(vw_assignedtasks).filter(
+                        vw_assignedtasks.diceid == dice_id
+                    ).order_by(vw_assignedtasks.facenumber).all():
                     dice_faces.append(face.to_dict())
 
                 db.close()
@@ -113,20 +115,18 @@ def api_tasks_available(dice_id = None):
             vw_assignedtasks.taskid.is_not(None)
         ).all()
 
-        print([i[0] for i in assigned_tasks])
-
-        tasks = []
+        _tasks = []
         for task in db.query(Tasks).filter(Tasks.taskid.not_in([i[0] for i in assigned_tasks])).all():
-            tasks.append(task.to_dict())
+            _tasks.append(task.to_dict())
 
-        return make_response({ "tasks" : tasks })
+        return make_response({ "tasks" : _tasks })
 
 @app.route('/api/tasks', methods=['GET'])
 def api_tasks():
     if request.method == 'GET':
         js_list = []
-        for tasks in get_tasks():
-            js_list.append(tasks.to_dict())
+        for _tasks in get_tasks():
+            js_list.append(_tasks.to_dict())
 
         return make_response({ "tasks" : js_list })
     
@@ -258,15 +258,15 @@ def api_recording():
 # Controller Start
 def get_dice():
     with session_scope() as db:
-        dice = db.query(Dice).order_by(Dice.uuid).all()
+        _dice = db.query(Dice).order_by(Dice.uuid).all()
         db.close()
-        return dice
+        return _dice
 
 def get_tasks():
     with session_scope() as db:
-        tasks = db.query(vw_tasks).order_by(vw_tasks.taskname).all()
+        _tasks = db.query(vw_tasks).order_by(vw_tasks.taskname).all()
         db.close()
-        return tasks
+        return _tasks
 
 def get_tasktypes():
     with session_scope() as db:
@@ -309,15 +309,13 @@ def get_task(task_id):
 def create_recording(dice_recording:DiceRecording):
     """ Create A Dice Recording, consume dice_recording"""
     with session_scope() as db:
-        # TODO Replace With View!
-
         # Get Dice
-        dice:Dice = db.query(Dice).filter_by(uuid = dice_recording.device_uuid).first()
-        if (dice is None):
+        _dice:Dice = db.query(Dice).filter_by(uuid = dice_recording.device_uuid).first()
+        if (_dice is None):
             return Response("Dice could not be found", 404)
         
         # Get Dice Face
-        face:DiceFace = db.query(DiceFace).filter_by(dice = dice.diceid, facenumber = dice_recording.dice_face).first()
+        face:DiceFace = db.query(DiceFace).filter_by(dice = _dice.diceid, facenumber = dice_recording.dice_face).first()
         if (face is None):
             return Response("Dice Face could not be found", 404)
         
@@ -331,7 +329,7 @@ def create_recording(dice_recording:DiceRecording):
             return Response("Task assigned but could not be found", 404)
         
         # Get User
-        user_dice:UserDice = db.query(UserDice).filter_by(dice = dice.diceid).first()
+        user_dice:UserDice = db.query(UserDice).filter_by(dice = _dice.diceid).first()
         if (user_dice is None):
             user:User = None
         else:
@@ -339,7 +337,7 @@ def create_recording(dice_recording:DiceRecording):
 
         # Create our recording entry
         try:
-            recording = Recording(dice, task, user, dice_recording)
+            recording = Recording(_dice, task, user, dice_recording)
             db.add(recording)
 
         except Exception as ex:
