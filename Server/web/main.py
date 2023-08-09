@@ -1,4 +1,5 @@
 # pylint: disable=broad-exception-caught, unused-argument, missing-module-docstring, missing-function-docstring, wildcard-import, unused-wildcard-import
+from datetime import datetime
 import json
 from types import SimpleNamespace
 from pprint import PrettyPrinter
@@ -34,6 +35,10 @@ def recreate_database():
     Base.metadata.create_all(engine)
 
 # Web Routes Start
+@app.context_processor
+def inject_now():
+    return {'year': datetime.utcnow().year}
+
 @app.route('/')
 def index():
     return render_template('index.html', tasks=get_efforts(), dicetasks=get_dice_face_tasks())
@@ -45,6 +50,10 @@ def dice():
 @app.route('/tasks')
 def tasks():
     return render_template('tasks.html', tasks=get_tasks(), tasktypes=get_tasktypes())
+
+@app.route('/about')
+def about():
+    return render_template('about.html')
 
 @app.route('/api/dice', methods=['GET', 'POST'])
 @app.route('/api/dice/<dice_id>', methods=['GET'])

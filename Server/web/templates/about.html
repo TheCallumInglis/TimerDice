@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+    <div class="my-5">
+        <div class="p-5 text-center bg-body-tertiary">
+            <div class="container py-5">
+                <h1 class="text-body-emphasis">{% block title %} About Timer Cube {% endblock %}</h1>
+                <p>Time tracking made easy. Build yourself a high-tech dice, with as many faces as you please, and easily setup each face to track individual tasks. Integrate with external DevOps tools to report task spend/effort and increase client confidence with accurate spend reports.</p>
+                <hr>
+                <div class="row justify-content-center">
+                    <div class="col-md-8 border border-success rounded py-2 my-2">
+                        <h3>Key Features</h3>
+
+                        <ul class="list-group my-3">
+                            <li class="list-group-item">Self-Hosted - Designed to run on containers, giving you full control of deployment</li>
+                            <li class="list-group-item">Expandable - As many dice, dice faces, tasks and task types as you desire</li>
+                            <li class="list-group-item">Integration - Connect to 3rd party DevOps/Project Management Systems</li>
+                            <li class="list-group-item">FOSS - Build upon this system as you please, make your ideas a reality</li>
+                            <li class="list-group-item">Low Power - Dice designed to run on battery for many days without charge</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+{% endblock %}
