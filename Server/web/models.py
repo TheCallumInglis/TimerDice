@@ -65,7 +65,12 @@ class Tasks(Base, CustomSerializerMixin):
     taskid = Column(Integer, primary_key=True)
     tasktype = Column(Integer)
     organisation = Column(Integer)
-    name = Column(String)    
+    name = Column(String)
+
+    def __init__(self, tasktype:int, organisation: int, name:String):
+        self.tasktype = tasktype
+        self.organisation = organisation
+        self.name = name
 
     def to_json(self):
         return json.dumps(self.to_dict(), default=lambda o: o.__dict__, sort_keys=True)
@@ -195,6 +200,19 @@ class vw_assignedtasks(Base, CustomSerializerMixin):
     taskid = Column(Integer)
     taskname = Column(String)
     tasktype = Column(String)
+
+    def to_json(self):
+        return json.dumps(self.to_dict(), default=lambda o: o.__dict__, sort_keys=True)
+
+class vw_tasks(Base, CustomSerializerMixin):
+    __tablename__ ='vw_tasks'
+
+    taskid = Column(Integer, primary_key=True, unique=True)
+    taskname = Column(String)
+    tasktypeid = Column(Integer)
+    tasktype = Column(String)
+    organisationid = Column(Integer)
+    organisation = Column(String)
 
     def to_json(self):
         return json.dumps(self.to_dict(), default=lambda o: o.__dict__, sort_keys=True)
