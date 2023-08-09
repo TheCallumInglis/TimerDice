@@ -31,7 +31,7 @@ FROM userdice
     LEFT OUTER JOIN diceface ON dice.diceid = diceface.dice -- Faces
     LEFT OUTER JOIN dicefacetask ON diceface.dicefaceid = dicefacetask.diceface -- Faces-to-Tasks Mapping
     LEFT OUTER JOIN tasks ON dicefacetask.task = tasks.taskid -- Tasks
-    LEFT OUTER JOIN tasktype On tasks.tasktype = tasktype.tasktypeid
+    LEFT OUTER JOIN tasktype On tasks.tasktype = tasktype.tasktypeid;
 
 
 -- =============================================================================
@@ -55,7 +55,7 @@ SELECT
 
 FROM tasks
     LEFT OUTER JOIN tasktype On tasks.tasktype = tasktype.tasktypeid
-    LEFT OUTER JOIN organisation ON tasks.organisation = organisation.organisationid
+    LEFT OUTER JOIN organisation ON tasks.organisation = organisation.organisationid;
 
 -- =============================================================================
 
@@ -77,4 +77,4 @@ FROM tasks
 		ON tasktype.tasktypeid = tasks.tasktype
 		
 	LEFT JOIN organisation
-		ON organisation.organisationid = tasks.organisation
+		ON organisation.organisationid = tasks.organisation;

@@ -31,29 +31,26 @@
     <table class="table">
         <thead>
             <tr>
-                <th colspan="4">Dice</th>
+                <th colspan="3">Dice</th>
                 <th colspan="2">User</th>
-                <th colspan="4">Task</th>
+                <th colspan="3">Task</th>
             </tr>
             <tr>
-                <th>ID</th>
                 <th>UUID</th>
                 <th>Name</th>
-                <th>Num. Faces</th>
+                <th>Faces</th>
 
                 <th>Name</th>
                 <th>Organisation</th>
 
-                <th>Face Num.</th>
-                <th>Task ID</th>
-                <th>Task Name</th>
+                <th>Face</th>
+                <th>Task</th>
                 <th>Task Type</th>
             </tr>
         </thead>
         <tbody>
             {% for dicetask in dicetasks %}
             <tr>
-                <td>{{ dicetask['diceid'] }}</td>
                 <td>{{ dicetask['uuid'] }}</td>
                 <td>{{ dicetask['name'] }}</td>
                 <td>{{ dicetask['faces'] }}</td>
@@ -62,7 +59,6 @@
                 <td>{{ dicetask['organisation'] }}</td>
 
                 <td>{{ dicetask['facenumber'] }}</td>
-                <td>{{ dicetask['taskid'] }}</td>
                 <td>{{ dicetask['taskname'] }}</td>
                 <td>{{ dicetask['tasktype'] }}</td>
             </tr>
