@@ -42,6 +42,10 @@ def index():
 def dice():
     return render_template('dice.html', dice=get_dice())
 
+@app.route('/tasks')
+def tasks():
+    return render_template('tasks.html', tasks=get_tasks())
+
 @app.route('/api/dice', methods=['GET', 'POST'])
 @app.route('/api/dice/<dice_id>', methods=['GET'])
 def api_dice(dice_id = None):
@@ -117,6 +121,17 @@ def api_tasks_available(dice_id = None):
 
         return make_response({ "tasks" : tasks })
 
+@app.route('/api/tasks', methods=['GET'])
+def api_tasks():
+    if request.method == 'GET':
+        js_list = []
+        for tasks in get_tasks():
+            js_list.append(tasks.to_dict())
+
+        return make_response({ "tasks" : js_list })
+    
+    return Response("Method Not Allowed", 405)
+
 @app.route('/api/tasks/assign', methods=['POST'])
 def api_tasks_assign():
     """ API Method: Assign Task To Dice Face"""
@@ -153,6 +168,56 @@ def api_tasks_assign():
         #     print("Hit Exception: %r" % exception)
         #     return Response('Server Error', 503)
 
+@app.route('/api/tasks/add', methods=['POST'])
+def api_tasks_add():
+    if request.method == 'POST' and request.mimetype == 'multipart/form-data':
+        # TODO Error Handling
+        new_task = Tasks(request.form['addTaskType'], request.form['addTaskOrganisation'], request.form['addTaskName'])
+
+        try:
+            with session_scope() as db:
+                # Check Task does not already exist
+                if db.query(Tasks).filter(Tasks.name == new_task.name, Tasks.organisation == new_task.organisation).count() > 0:
+                    return Response('Duplicate Task within Organisation', 409)
+                
+                # Create New Task
+                db.add(new_task)
+                new_task:Tasks = db.query(Tasks).filter(
+                    Tasks.name == new_task.name, 
+                    Tasks.organisation == new_task.organisation, 
+                    Tasks.tasktype == new_task.tasktype
+                ).first()
+
+                return Response(new_task.to_json(), 200)
+
+        except Exception as exception:
+            print("Hit Exception: %r" % exception)
+            return Response('Server Error', 503)
+    
+    return Response(405) # Not Allowed
+
+@app.route('/api/tasktypes', methods=['GET'])
+def api_tasktypes():
+    if request.method == 'GET':
+        js_list = []
+        for tasktype in get_tasktypes():
+            js_list.append(tasktype.to_dict())
+
+        return make_response({ "tasktypes" : js_list })
+
+    return Response("Method Not Allowed", 405)
+
+@app.route('/api/organisation', methods=['GET'])
+def api_organisation():
+    if request.method == 'GET':
+        js_list = []
+        for organisations in get_organisations():
+            js_list.append(organisations.to_dict())
+
+        return make_response({ "organisation" : js_list })
+
+    return Response("Method Not Allowed", 405)
+
 @app.route('/api/recording', methods=['GET', 'POST'])
 def api_recording():
     """ API Method: Start/End or Get a recording"""
@@ -172,6 +237,24 @@ def get_dice():
         dice = db.query(Dice).order_by(Dice.uuid).all()
         db.close()
         return dice
+
+def get_tasks():
+    with session_scope() as db:
+        tasks = db.query(vw_tasks).order_by(vw_tasks.taskname).all()
+        db.close()
+        return tasks
+
+def get_tasktypes():
+    with session_scope() as db:
+        tasktypes = db.query(TaskType).order_by(TaskType.name).all()
+        db.close()
+        return tasktypes
+
+def get_organisations():
+    with session_scope() as db:
+        organisations = db.query(Organisation).order_by(Organisation.name).all()
+        db.close()
+        return organisations
 
 def get_efforts():
     with session_scope() as db:

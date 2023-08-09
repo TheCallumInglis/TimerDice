@@ -1,25 +1,7 @@
 const Timer = {
     activeNavMenuCls: 'link-secondary',
-    frmAddDice: document.getElementById('frmAddDice'),
-    addDiceModal: new bootstrap.Modal(document.getElementById('addDiceModal')),
-    lblAddDiceError: document.getElementById('lblAddDiceError'),
-    btnAddNewDice: document.getElementById('btnAddNewDice'),
-    btnRefreshDiceTable: document.getElementById('btnRefreshDiceTable'),
-    diceTable: document.getElementById('diceTable'),
 
-    // Dice Face Config
-    diceFaceModal: new bootstrap.Modal(document.getElementById('diceFaceModal')),
-    lblDiceFaceModalUUID: document.getElementById('lblDiceFaceModalUUID'),
-    lblDiceFaceModalError,
-    diceFaceTable: document.getElementById('diceFaceTable'),
-
-    // Assign task to dice face
-    assignTaskToDiceFaceModal: new bootstrap.Modal(document.getElementById('assignTaskToDiceFaceModal')),
-    frmAssignTaskToDiceFace: document.getElementById('frmAssignTaskToDiceFace'),
-    optDiceFaceTaskList: document.getElementById('dicefacetasktasklist'),
-    lblAssignTaskToDiceFaceError: document.getElementById('lblAssignTaskToDiceFaceError'),
-
-    // Highlight the currently active nav menu item
+    // Highlight the currently active nav menu item, init JS vars for section
     setNavMenu: () => {
         "use strict";
         let path = window.location.pathname;
@@ -27,8 +9,60 @@ const Timer = {
         document.querySelectorAll('[href="' + path + '"]').forEach(el => { 
             el.classList.add(Timer.activeNavMenuCls); 
         });
+
+        switch (path) {
+            case '/dice':
+                Timer.setupDiceJS();
+            case '/tasks':
+                Timer.setupTasksJS();
+        }
     },
 
+    setupDiceJS: () => {
+        // Add Dice Config
+        Timer.frmAddDice = document.getElementById('frmAddDice');
+        Timer.addDiceModal = new bootstrap.Modal(document.getElementById('addDiceModal'));
+        Timer.lblAddDiceError = document.getElementById('lblAddDiceError');
+        Timer.btnAddNewDice = document.getElementById('btnAddNewDice');
+        Timer.btnRefreshDiceTable = document.getElementById('btnRefreshDiceTable');
+        Timer.diceTable = document.getElementById('diceTable');
+
+        // Dice Face Config
+        Timer.diceFaceModal = new bootstrap.Modal(document.getElementById('diceFaceModal'));
+        Timer.lblDiceFaceModalUUID = document.getElementById('lblDiceFaceModalUUID');
+        Timer.lblDiceFaceModalError;
+        Timer.diceFaceTable = document.getElementById('diceFaceTable');
+
+        // Assign task to dice face
+        Timer.assignTaskToDiceFaceModal = new bootstrap.Modal(document.getElementById('assignTaskToDiceFaceModal'));
+        Timer.frmAssignTaskToDiceFace = document.getElementById('frmAssignTaskToDiceFace');
+        Timer.optDiceFaceTaskList = document.getElementById('dicefacetasktasklist');
+        Timer.lblAssignTaskToDiceFaceError = document.getElementById('lblAssignTaskToDiceFaceError');
+
+        Timer.frmAddDice.addEventListener("submit", (e) => {
+            e.preventDefault();
+            Timer.addNewDice();
+        });
+        
+        Timer.btnRefreshDiceTable.addEventListener('click', (e) => {
+            e.preventDefault();
+            Timer.refreshDiceTable();
+        });
+        
+        Timer.btnAddNewDice.addEventListener('click', (e) => {
+            e.preventDefault();
+        
+            Timer.ResetNewDiceModal();
+            Timer.addDiceModal.show();
+        });
+        
+        Timer.frmAssignTaskToDiceFace.addEventListener("submit", (e) => {
+            e.preventDefault();
+            Timer.AssignTaskToDiceFace();
+        });
+    },
+
+    /** DICE **/
     addNewDice: async () => {
         "use strict";
 
@@ -98,7 +132,7 @@ const Timer = {
 
         Timer.lblDiceFaceModalUUID.innerText = "";
         Timer.diceFaceTable.innerHTML = "";
-        
+
         let response = await fetch("/api/dice/" + diceid);
         let result = await response.json();
 
@@ -189,6 +223,139 @@ const Timer = {
             Timer.lblAssignTaskToDiceFaceError.innerText = 'Failed to assign task... ' + error;
         }
     },
+
+    /** TASK **/
+    setupTasksJS: () => {
+        "use strict";
+
+        // Add Task Config
+        Timer.frmAddTask = document.getElementById('frmAddTask');
+        Timer.addTaskModal = new bootstrap.Modal(document.getElementById('addTaskModal'));
+        Timer.lblAddTaskError = document.getElementById('lblAddTaskError');
+        Timer.btnAddNewTask = document.getElementById('btnAddNewTask');
+        Timer.btnRefreshTaskTable = document.getElementById('btnRefreshTaskTable');
+        Timer.taskTable = document.getElementById('taskTable');
+
+        Timer.optAddTaskType = document.getElementById('addTaskType');
+        Timer.optAddTaskOrganisation = document.getElementById('addTaskOrganisation');
+
+        Timer.frmAddTask.addEventListener("submit", (e) => {
+            e.preventDefault();
+            Timer.addNewTask(); // TODO
+        });
+        
+        Timer.btnRefreshTaskTable.addEventListener('click', (e) => {
+            e.preventDefault();
+            Timer.refreshTaskTable(); // TOOD
+        });
+        
+        Timer.btnAddNewTask.addEventListener('click', (e) => {
+            e.preventDefault();
+            Timer.ResetNewTaskModal(); // TODO
+            Timer.addTaskModal.show();
+        });
+    },
+
+    ResetNewTaskModal: async () => {
+        "use strict";
+
+        Timer.lblAddTaskError.classList.add('hidden');
+        frmAddTask.elements.addTaskName.value = '';
+        frmAddTask.elements.addTaskType.innerHTML = "";
+        frmAddTask.elements.addTaskOrganisation.innerHTML = "";
+
+        // Fill Drop-down options : Task Type
+        let response = await fetch("/api/tasktypes");
+        let result = await response.json();
+
+        if (result['tasktypes'].length == 0) {
+            Timer.lblAddTaskError.classList.remove('hidden');
+            Timer.lblAddTaskError.innerText = 'No Task Types Available';
+            return;
+        }
+
+        AddOptionToSelect(Timer.optAddTaskType, 'Select...', null, true, true);
+        for (let tasktype in result['tasktypes']) {
+            AddOptionToSelect(
+                Timer.optAddTaskType, 
+                result['tasktypes'][tasktype]['name'],
+                result['tasktypes'][tasktype]['tasktypeid']
+            );
+        }
+
+        // Fill Drop-down options: Organisation
+        response = await fetch("/api/organisation");
+        result = await response.json();
+
+        if (result['organisation'].length == 0) {
+            Timer.lblAddTaskError.classList.remove('hidden');
+            Timer.lblAddTaskError.innerText = 'No Organisations Available';
+            return;
+        }
+
+        AddOptionToSelect(Timer.optAddTaskOrganisation, 'Select...', null, true, true);
+        for (let organisation in result['organisation']) {
+            AddOptionToSelect(
+                Timer.optAddTaskOrganisation, 
+                result['organisation'][organisation]['name'],
+                result['organisation'][organisation]['organisationid']
+            );
+        }
+    },
+
+    addNewTask: async () => {
+        "use strict";
+
+        Timer.lblAddTaskError.classList.add('hidden');
+
+        try {
+            let response = await fetch(
+                "/api/tasks/add", 
+                {
+                    method: 'POST',
+                    body: new FormData(document.querySelector('#frmAddTask')),
+                }
+            );
+
+            if (response.status != 200) {
+                throw 'Bad Response, got: ' + response.status + '. Error: ' + await response.text();
+            }
+
+            const result = await response.json();
+
+            Timer.refreshTaskTable();
+            appendAlert('Task Added!', 'success', 2500);
+            Timer.addTaskModal.hide();
+
+        } catch (error) {
+            Timer.lblAddTaskError.classList.remove('hidden');
+            Timer.lblAddTaskError.innerText = 'Failed to add task... ' + error;
+        }
+    },
+
+    refreshTaskTable: async () => {
+        "use strict";
+
+        try {
+            let response = await fetch("/api/tasks");
+            let result = await response.json();
+
+            Timer.taskTable.innerHTML = "";
+            for (let task in result['tasks']) {
+                Timer.taskTable.innerHTML += `<tr>
+                    <td>${result['tasks'][task]['taskname']}</td>
+                    <td>${result['tasks'][task]['tasktype']}</td>
+                    <td>${result['tasks'][task]['organisation']}</td>
+                    <td>
+                        <a href="#" onclick="Timer.TaskDetailModal(${result['tasks'][task]['taskid']});">View</a>
+                    </td>
+                </tr>`;
+            }
+
+        } catch (error) {
+            appendAlert('Failed to fetch tasks... ' + error.message, 'warning');
+        }
+    },
 }
 
 const AddOptionToSelect = (el, text, value, selected = false, disabled = false) => {
@@ -222,25 +389,3 @@ const appendAlert = async (message, type, duration = 0) => {
 }
 
 Timer.setNavMenu();
-
-Timer.frmAddDice.addEventListener("submit", (e) => {
-    e.preventDefault();
-    Timer.addNewDice();
-});
-
-Timer.btnRefreshDiceTable.addEventListener('click', (e) => {
-    e.preventDefault();
-    Timer.refreshDiceTable();
-});
-
-Timer.btnAddNewDice.addEventListener('click', (e) => {
-    e.preventDefault();
-
-    Timer.ResetNewDiceModal();
-    Timer.addDiceModal.show();
-});
-
-Timer.frmAssignTaskToDiceFace.addEventListener("submit", (e) => {
-    e.preventDefault();
-    Timer.AssignTaskToDiceFace();
-});

@@ -56,3 +56,25 @@ SELECT
 FROM tasks
     LEFT OUTER JOIN tasktype On tasks.tasktype = tasktype.tasktypeid
     LEFT OUTER JOIN organisation ON tasks.organisation = organisation.organisationid
+
+-- =============================================================================
+
+CREATE VIEW vw_tasks
+AS
+
+SELECT
+	tasks.taskid,
+	tasks.name as taskname,
+	
+	tasktype.tasktypeid,
+	tasktype.name as tasktype,
+	
+	organisation.organisationid,
+	organisation.name as organisation
+	
+FROM tasks
+	LEFT JOIN tasktype
+		ON tasktype.tasktypeid = tasks.tasktype
+		
+	LEFT JOIN organisation
+		ON organisation.organisationid = tasks.organisation
