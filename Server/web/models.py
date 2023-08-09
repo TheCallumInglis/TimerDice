@@ -56,6 +56,9 @@ class TaskType(Base, CustomSerializerMixin):
     tasktypeid = Column(Integer, primary_key=True)
     name = Column(String)
 
+    def __init__(self, name):
+        self.name = name
+
     def to_json(self):
         return json.dumps(self.to_dict(), default=lambda o: o.__dict__, sort_keys=True)
 
