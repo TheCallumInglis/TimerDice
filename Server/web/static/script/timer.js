@@ -223,36 +223,63 @@ const Timer = {
             Timer.lblAssignTaskToDiceFaceError.innerText = 'Failed to assign task... ' + error;
         }
     },
+    /** END DICE **/
 
     /** TASK **/
     setupTasksJS: () => {
         "use strict";
 
+        /** TASKS **/
         // Add Task Config
-        Timer.frmAddTask = document.getElementById('frmAddTask');
-        Timer.addTaskModal = new bootstrap.Modal(document.getElementById('addTaskModal'));
-        Timer.lblAddTaskError = document.getElementById('lblAddTaskError');
         Timer.btnAddNewTask = document.getElementById('btnAddNewTask');
         Timer.btnRefreshTaskTable = document.getElementById('btnRefreshTaskTable');
         Timer.taskTable = document.getElementById('taskTable');
 
+        // Add Task Modal
+        Timer.frmAddTask = document.getElementById('frmAddTask');
+        Timer.addTaskModal = new bootstrap.Modal(document.getElementById('addTaskModal'));
+        Timer.lblAddTaskError = document.getElementById('lblAddTaskError');
         Timer.optAddTaskType = document.getElementById('addTaskType');
         Timer.optAddTaskOrganisation = document.getElementById('addTaskOrganisation');
 
         Timer.frmAddTask.addEventListener("submit", (e) => {
             e.preventDefault();
-            Timer.addNewTask(); // TODO
-        });
-        
-        Timer.btnRefreshTaskTable.addEventListener('click', (e) => {
-            e.preventDefault();
-            Timer.refreshTaskTable(); // TOOD
+            Timer.addNewTask();
         });
         
         Timer.btnAddNewTask.addEventListener('click', (e) => {
             e.preventDefault();
-            Timer.ResetNewTaskModal(); // TODO
+            Timer.ResetNewTaskModal();
             Timer.addTaskModal.show();
+        });
+
+        /** TASK TYPES **/
+        // Add Task Type Config
+        Timer.btnAddNewTaskType = document.getElementById('btnAddNewTaskType');
+        Timer.tasktypeTable = document.getElementById('tasktypeTable');
+
+        // Add Task Types Modal
+        Timer.frmAddTaskType = document.getElementById('frmAddTaskType');
+        Timer.addTaskTypeModal = new bootstrap.Modal(document.getElementById('addTaskTypeModal'));
+        Timer.lblAddTaskTypeError = document.getElementById('lblAddTaskTypeError');
+        Timer.txtAddTaskTypeNmae = document.getElementById('addTaskTypeName');
+
+        Timer.btnAddNewTaskType.addEventListener('click', (e) => {
+            e.preventDefault();
+            Timer.ResetNewTaskTypeModal();
+            Timer.addTaskTypeModal.show();
+        });
+
+        Timer.frmAddTaskType.addEventListener("submit", (e) => {
+            e.preventDefault();
+            Timer.addNewTaskType();
+        });
+
+        /** GENERIC **/
+        Timer.btnRefreshTaskTable.addEventListener('click', (e) => {
+            e.preventDefault();
+            Timer.refreshTaskTable();
+            Timer.refreshTaskTypesTable();
         });
     },
 
@@ -356,6 +383,63 @@ const Timer = {
             appendAlert('Failed to fetch tasks... ' + error.message, 'warning');
         }
     },
+
+    // Task Type
+    ResetNewTaskTypeModal: () => {
+        "use strict";
+        Timer.lblAddTaskTypeError.classList.add('hidden');
+        frmAddTaskType.elements.addTaskTypeName.value = '';
+    },
+
+    addNewTaskType: async () => {
+        "use strict";
+
+        Timer.lblAddTaskTypeError.classList.add('hidden');
+
+        try {
+            let response = await fetch(
+                "/api/tasktypes/add", 
+                {
+                    method: 'POST',
+                    body: new FormData(document.querySelector('#frmAddTaskType')),
+                }
+            );
+
+            if (response.status != 200) {
+                throw 'Bad Response, got: ' + response.status + '. Error: ' + await response.text();
+            }
+
+            const result = await response.json();
+
+            Timer.refreshTaskTypesTable();
+            appendAlert('Task Type Added!', 'success', 2500);
+            Timer.addTaskTypeModal.hide();
+
+        } catch (error) {
+            Timer.lblAddTaskTypeError.classList.remove('hidden');
+            Timer.lblAddTaskTypeError.innerText = 'Failed to add task type... ' + error;
+        }
+    },
+
+    refreshTaskTypesTable: async () => {
+        "use strict";
+
+        try {
+            let response = await fetch("/api/tasktypes");
+            let result = await response.json();
+
+            Timer.tasktypeTable.innerHTML = "";
+            for (let tasktype in result['tasktypes']) {
+                Timer.tasktypeTable.innerHTML += `<tr>
+                    <td>${result['tasktypes'][tasktype]['name']}</td>
+                </tr>`;
+            }
+
+        } catch (error) {
+            appendAlert('Failed to fetch task types... ' + error.message, 'warning');
+        }
+    },
+    /** END TASK **/
 }
 
 const AddOptionToSelect = (el, text, value, selected = false, disabled = false) => {

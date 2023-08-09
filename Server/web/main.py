@@ -44,7 +44,7 @@ def dice():
 
 @app.route('/tasks')
 def tasks():
-    return render_template('tasks.html', tasks=get_tasks())
+    return render_template('tasks.html', tasks=get_tasks(), tasktypes=get_tasktypes())
 
 @app.route('/api/dice', methods=['GET', 'POST'])
 @app.route('/api/dice/<dice_id>', methods=['GET'])
@@ -206,6 +206,30 @@ def api_tasktypes():
         return make_response({ "tasktypes" : js_list })
 
     return Response("Method Not Allowed", 405)
+
+@app.route('/api/tasktypes/add', methods=['POST'])
+def api_tasktypes_add():
+    if request.method == 'POST' and request.mimetype == 'multipart/form-data':
+        # TODO Error Handling
+        new_task_type = TaskType(request.form['addTaskTypeName'])
+
+        try:
+            with session_scope() as db:
+                # Check Task Type does not already exist
+                if db.query(TaskType).filter(TaskType.name == new_task_type.name).count() > 0:
+                    return Response('Duplicate Task Type', 409)
+                
+                # Create New Task Type
+                db.add(new_task_type)
+                new_task_type:TaskType = db.query(TaskType).filter(TaskType.name == new_task_type.name).first()
+
+                return Response(new_task_type.to_json(), 200)
+
+        except Exception as exception:
+            print("Hit Exception: %r" % exception)
+            return Response('Server Error', 503)
+    
+    return Response(405) # Not Allowed
 
 @app.route('/api/organisation', methods=['GET'])
 def api_organisation():
