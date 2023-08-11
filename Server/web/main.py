@@ -18,6 +18,14 @@ pp = PrettyPrinter(indent=4)
 engine = create_engine(DATABASE_URI)
 Session = sessionmaker(bind=engine)
 
+# TODO  Assign colours to faces (Hex preferred)
+# TODO  Record on-device recording ID in recording record.
+#       Use this for for the dice to check if a recording has been sucesflly saved, and if so, delete local recording file
+# TODO  Handle un-assigned task recordings
+# TODO  Show "In Progress" Tasks
+# TODO  Handle task recordings with no end date
+# TODO  Allow manual recording of effort through API
+
 @contextmanager
 def session_scope():
     session = Session()
