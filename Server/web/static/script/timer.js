@@ -154,7 +154,12 @@ const Timer = {
 
             Timer.diceFaceTable.innerHTML += `<tr>
                 <td>${result['faces'][face]['facenumber']}</td>
-                <td><a href="#" onclick="Timer.taskSpendReport(${result['faces'][face]['taskid']});">${result['faces'][face]['taskname'] ?? '-'}</a></td>
+                <td>
+                    ${result['faces'][face]['taskname'] == null 
+                        ? '-'
+                        : `<a href="#" onclick="Timer.taskSpendReport(${result['faces'][face]['taskid']});">${result['faces'][face]['taskname']}</a>`
+                    }
+                </td>
                 <td>
                     <a href="#" onclick="Timer.AssignTaskToDiceFaceModal(
                         ${result['faces'][face]['diceid']},
