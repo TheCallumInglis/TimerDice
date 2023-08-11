@@ -10,6 +10,8 @@ const Timer = {
             el.classList.add(Timer.activeNavMenuCls); 
         });
 
+        Timer.setupGlobalJS();
+
         switch (path) {
             case '/dice':
                 Timer.setupDiceJS();
@@ -18,6 +20,14 @@ const Timer = {
         }
     },
 
+    setupGlobalJS: () => {
+        Timer.lblTaskSpendTitle = document.getElementById('lblTaskSpendTitle');
+        Timer.taskSpendTable = document.getElementById('taskSpendTable');
+        Timer.lblTaskSpendError = document.getElementById('lblTaskSpendError');
+        Timer.taskSpendModal = new bootstrap.Modal(document.getElementById('taskSpendModal'));
+    },
+
+    /** DICE **/
     setupDiceJS: () => {
         // Add Dice Config
         Timer.frmAddDice = document.getElementById('frmAddDice');
@@ -62,7 +72,6 @@ const Timer = {
         });
     },
 
-    /** DICE **/
     addNewDice: async () => {
         "use strict";
 
@@ -145,7 +154,7 @@ const Timer = {
 
             Timer.diceFaceTable.innerHTML += `<tr>
                 <td>${result['faces'][face]['facenumber']}</td>
-                <td>${result['faces'][face]['taskname'] ?? '-'}</td>
+                <td><a href="#" onclick="Timer.taskSpendReport(${result['faces'][face]['taskid']});">${result['faces'][face]['taskname'] ?? '-'}</a></td>
                 <td>
                     <a href="#" onclick="Timer.AssignTaskToDiceFaceModal(
                         ${result['faces'][face]['diceid']},
@@ -440,6 +449,35 @@ const Timer = {
         }
     },
     /** END TASK **/
+
+
+    /** TASK SPEND REPORT **/
+    taskSpendReport: async (task_id) => {
+        "use strict";
+
+        Timer.lblTaskSpendTitle.innerText = "";
+        Timer.taskSpendTable.innerHTML = "";
+        Timer.lblTaskSpendError.innerText = "";
+
+        let response = await fetch("/api/tasks/spend/" + task_id);
+        let result = await response.json();
+
+        if (result['task']) {
+            Timer.lblTaskSpendTitle.innerText = result['task']['name'];
+        }
+
+        for (let recording in result['task_spend_report']) {
+            Timer.taskSpendTable.innerHTML += `<tr>
+                <td>${result['task_spend_report'][recording]['starttime']}</td>
+                <td>${result['task_spend_report'][recording]['endtime']}</td>
+                <td>${result['task_spend_report'][recording]['spendtime']}</td>
+                <td>${result['task_spend_report'][recording]['username']}</td>
+            </tr>`;
+        }
+
+        Timer.taskSpendModal.show();
+    }
+    /** END TASK SPEND REPORT **/
 }
 
 const AddOptionToSelect = (el, text, value, selected = false, disabled = false) => {

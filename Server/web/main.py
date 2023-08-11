@@ -205,6 +205,27 @@ def api_tasks_add():
     
     return Response(405) # Not Allowed
 
+@app.route('/api/tasks/spend/<task_id>', methods=['GET'])
+def api_tasks_spend(task_id):
+    if task_id is None:
+        return Response(400)
+    
+    with session_scope() as db:
+        task_spend_report = db.query(vw_taskspendreport).filter(
+                vw_taskspendreport.taskid == task_id
+            ).order_by(
+                vw_taskspendreport.starttime
+            ).all()
+
+        report = []
+        for recording in task_spend_report:
+            report.append(recording.to_dict())
+
+        return make_response({
+            "task_spend_report" : report, 
+            "task" : get_task(task_id).to_dict()
+        })
+
 @app.route('/api/tasktypes', methods=['GET'])
 def api_tasktypes():
     if request.method == 'GET':

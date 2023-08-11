@@ -78,3 +78,41 @@ FROM tasks
 		
 	LEFT JOIN organisation
 		ON organisation.organisationid = tasks.organisation;
+
+-- =============================================================================
+CREATE VIEW vw_taskspendreport
+AS
+
+SELECT
+	recording.recordingid,
+	recording.starttime,
+	recording.endtime,
+	
+	dice.diceid,
+	dice.uuid AS diceuuid,
+	dice.name AS dicename,
+	
+	tasks.taskid,
+	tasks.name AS taskname,
+	
+	tasktype.tasktypeid,
+	tasktype.name AS tasktype,
+	
+	"user".userid,
+	"user".name AS username,
+	
+	extract(EPOCH from recording.endtime::timestamp - recording.starttime::timestamp) AS spend, -- seconds
+	TO_CHAR(((extract(EPOCH from recording.endtime::timestamp - recording.starttime::timestamp)) || ' second')::interval, 'HH24:MI:SS') AS spendtime
+
+FROM recording
+	LEFT OUTER JOIN dice
+		ON dice.diceid = recording.dice
+		
+	LEFT OUTER JOIN tasks
+		ON tasks.taskid = recording.task
+		
+	LEFT OUTER JOIN tasktype
+		ON tasks.tasktype = tasktype.tasktypeid
+		
+	LEFT OUTER JOIN "user"
+		ON "user".userid = recording.user
