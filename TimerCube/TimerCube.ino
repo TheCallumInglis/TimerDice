@@ -12,6 +12,7 @@
 #include <WiFiUdp.h>
 #include <NTPClient.h>
 #include <TimeLib.h> 
+#include <FastLED.h>
 #include <PubSubClient.h> // MQTT Library: https://pubsubclient.knolleary.net/api
                           // With help from https://funprojects.blog/2018/12/07/rabbitmq-for-iot/
 
@@ -26,7 +27,6 @@ int recordingFace;
 int currentFace;
 
 int faceSwitchCounter = 0;
-int faceSwitchThreshold = 5; // Seconds
 bool isMotion = false;
 int slack = 0;
 
@@ -34,8 +34,11 @@ int slack = 0;
 int searchDirectionTimeout = SEARCH_DIRECTION_THRESHOLD * 1000 / SEARCH_DIRECTION_INTERVAL;
 
 // SD Card
-const int SdChipSelect = D4;
+const int SdChipSelect = A0;
 File myFile;
+
+// Neopixel
+CRGB leds[LED_COUNT];
 
 // Instance
 Adafruit_MPU6050 mpu;
@@ -160,6 +163,14 @@ void setupWebServer() {
   Serial.println("[webserver] :: Started");
 }
 
+void setupNeopixel() {
+  FastLED.addLeds<LED_TYPE, LED_PIN, LED_COLOUR_ORDER>(leds, LED_COUNT);
+  Serial.println("[Neopixel] Init done.");
+
+  delay(200);
+  SetLEDOff();
+}
+
 void setupInitVars() {
   // Reset Recording State
   isRecording = false;
@@ -185,6 +196,7 @@ void setupNotice() {
 }
 
 void setup() {
+  delay(3000);
   Serial.begin(SERIAL_BAUD);
   
   setupIndicators(); // Setup Buzzer & other outputs (Shut the thing up if pin is HIGH on boot)
@@ -214,6 +226,9 @@ void setup() {
 
   // Setup MQTT
   mqttClient.setServer(MQTT_URL, 1883);
+
+  // Setup Neopixel
+  setupNeopixel();
 
   setupWebServer(); // Setup Web Server
   setupInitVars(); // Initialise run-time vars
@@ -296,14 +311,14 @@ void motionDetected() {
 
 bool handleRecordingStart() {
   Serial.println("Starting Recording");
-  blink(BUZZER, 1, 300);
-  delay(1000); // Allow time to position cube
+  blink(BUZZER, 1, 250);
+  delay(750); // Allow time to position cube
 
-  int face = -1;
+  int face = 0;
 
   // Poll for direction until found or timeout reached
   Serial.print("[MOTION] Detecting Direction...");
-  while (face == -1 && searchDirectionTimeout > 0) {
+  while (face == 0 && searchDirectionTimeout > 0) {
     face = getFaceNow();
 
     delay(SEARCH_DIRECTION_INTERVAL);
@@ -311,7 +326,7 @@ bool handleRecordingStart() {
     Serial.print(".");
   }
 
-  if (face == -1) {
+  if (face == 0) {
     Serial.println("Failed to detect direction after motion");
     blink(BUZZER, 1, 2000);
 
@@ -326,6 +341,10 @@ bool handleRecordingStart() {
   if(!logStartRecording(face)) {
     return false;
   }
+
+  // Set LED Colour
+  Serial.println("Setting Face Colour Now");
+  SetLEDColour(face);
 
   isRecording = true;
   recordingFace = face;
@@ -389,6 +408,9 @@ bool logStopRecording() {
   dataFile.close();
   Serial.println(dataString);
 
+  // Turn off LEDs
+  SetLEDOff();
+
   // Publish to MQTT Recording Finished
   dataFile = SD.open(recordingFile, FILE_READ);
   if (dataFile) {
@@ -435,11 +457,11 @@ void loop() {
 
   /* Check current face matches what we're recording */
   int currentFace = getFaceNow();
-  if (isRecording && currentFace != -1 && currentFace != recordingFace) {
+  if (isRecording && currentFace != 0 && currentFace != recordingFace) {
     faceSwitchCounter++;
 
     // Wait a bit, check this is sensible
-    if (faceSwitchCounter > (faceSwitchThreshold * 1000) / LOOP_DELAY) {
+    if (faceSwitchCounter > (FACE_SWITCH_THRESHOLD * 1000) / LOOP_DELAY) {
       Serial.println("Detect face switch! Moving to new face");
       Serial.print("Old Face: "); Serial.println(recordingFace);
       Serial.print("New Face: "); Serial.println(currentFace);
@@ -459,7 +481,7 @@ void loop() {
   }
 
   /* Recording in progress */
-  digitalWrite(RECORDING_INDICATOR, (isRecording ? HIGH : LOW)); 
+  //digitalWrite(RECORDING_INDICATOR, (isRecording ? HIGH : LOW)); 
 
   delay(LOOP_DELAY);
   slack = max(slack - 1, 0); // Slack acts like debounce to prevent multiple motion fire events from same motion.
@@ -505,7 +527,7 @@ int getFace(double x, double y, double z) {
     if (y < 0) { return 3; } else { return 9; }
   }
 
-  return -1; // We broke it!
+  return 0; // We broke it!
 }
 
 void startRecordingTask(char* faceName) {
@@ -551,4 +573,36 @@ void reconnect() {
 /** HTTP Server **/
 void httpIndex() { 
   webserver.send(200, "text/plain", "Hello World! Device UUID: " + getDeviceUID()); 
+}
+
+/** Neopixel **/
+void SetLEDColour(int face) {
+
+  // https://github.com/FastLED/FastLED/wiki/Pixel-reference#predefined-colors-list
+  CRGB faceColours[] = {
+    CRGB::Black,      // 0 i.e. Off
+    CRGB::Red,        // 1
+    CRGB::Blue,       // 2
+    CRGB::Green,      // 3
+    CRGB::Orange,     // 4
+    CRGB::BlueViolet, // 5
+    CRGB::Chartreuse, // 6
+    CRGB::Cyan,       // 7
+    CRGB::Magenta,    // 8
+    CRGB::Grey,       // 9
+    CRGB::Maroon,     // 10
+    CRGB::OrangeRed,  // 11
+    CRGB::Aquamarine  // 12 
+  };
+
+  for (int i = 0; i < LED_COUNT; i++) {
+    leds[i] = faceColours[face];
+  }
+
+  FastLED.show();
+  FastLED.delay(10);
+}
+
+void SetLEDOff() {
+  SetLEDColour(0);
 }
