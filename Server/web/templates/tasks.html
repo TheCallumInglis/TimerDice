@@ -49,6 +49,8 @@
                             <td>{{ task['tasktype'] }}</td>
                             <td>{{ task['organisation'] }}</td>
                             <td>
+                                <a href="#" onclick="Timer.taskSpendReport({{task['taskid']}});">Spend</a>
+                                |
                                 <a href="#" onclick="Timer.TaskDetailModal({{task['taskid']}});">View</a>
                             </td>
                         </tr>   

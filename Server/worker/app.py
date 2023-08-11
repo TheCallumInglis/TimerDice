@@ -31,8 +31,8 @@ def mq_callback(channel, method, properties, body):
 
         if response.status_code != 200:
             pp.pprint(response.text)
-            channel.basic_nack(delivery_tag=method.delivery_tag)
-            return
+            #channel.basic_nack(delivery_tag=method.delivery_tag)
+            #return # disabled for testing
 
         channel.basic_ack(delivery_tag=method.delivery_tag)
         

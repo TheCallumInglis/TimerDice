@@ -21,7 +21,7 @@
                     <td>{{ task['tasktype'] }}</td>
                     <td>{{ task['organisation'] }}</td>
                     <td>{{ task['name'] }}</td>
-                    <td>{{ task['spendtime'] }}</td>
+                    <td><a href="#" onclick="Timer.taskSpendReport({{ task['taskid'] }});">{{ task['spendtime'] }}</a></td>
                 </tr>
             {% endfor %}
         </tbody>
@@ -59,7 +59,7 @@
                 <td>{{ dicetask['organisation'] }}</td>
 
                 <td>{{ dicetask['facenumber'] }}</td>
-                <td>{{ dicetask['taskname'] }}</td>
+                <td><a href="#" onclick="Timer.taskSpendReport({{ dicetask['taskid'] }});">{{ dicetask['taskname'] }}</a></td>
                 <td>{{ dicetask['tasktype'] }}</td>
             </tr>
             {% endfor %}

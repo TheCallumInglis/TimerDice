@@ -1,7 +1,7 @@
 from datetime import timedelta
 import json
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, UUID, Integer, String, DateTime, Double, PrimaryKeyConstraint
+from sqlalchemy import Column, UUID, Integer, String, DateTime, Double, PrimaryKeyConstraint, Interval
 from sqlalchemy_serializer import SerializerMixin
 
 Base = declarative_base()
@@ -212,6 +212,32 @@ class vw_tasks(Base, CustomSerializerMixin):
     tasktype = Column(String)
     organisationid = Column(Integer)
     organisation = Column(String)
+
+    def to_json(self):
+        return json.dumps(self.to_dict(), default=lambda o: o.__dict__, sort_keys=True)
+    
+class vw_taskspendreport(Base, CustomSerializerMixin):
+    __tablename__ = 'vw_taskspendreport'
+
+    recordingid = Column(Integer, primary_key=True)
+    starttime = Column(DateTime)
+    endtime = Column(DateTime)
+
+    diceid = Column(Integer)
+    diceuuid = Column(String)
+    dicename = Column(String)
+
+    taskid = Column(Integer)
+    taskname = Column(String)
+
+    tasktypeid = Column(Integer)
+    tasktype = Column(String)
+
+    userid = Column(Integer)
+    username = Column(String)
+
+    spend = Column(Double)
+    spendtime = Column(String)
 
     def to_json(self):
         return json.dumps(self.to_dict(), default=lambda o: o.__dict__, sort_keys=True)

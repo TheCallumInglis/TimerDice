@@ -41,6 +41,43 @@
       <div class="container">
         {% block content %} {% endblock %}
       </div>
+
+      <!-- Task Spend Report Modal -->
+      <div class="modal" id="taskSpendModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">Task Spend Report: <span id="lblTaskSpendTitle"></span></h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+              <!-- TODO TOTAL SPEND TIME-->
+
+              <!-- SPEND REPORT -->
+              <table class="table table-striped table-bordered mt-4">
+                <thead>
+                  <tr class="text-center">
+                    <th>Start Time</th>
+                    <th>End Time</th>
+                    <th>Duration</th>
+                    <th>User</th>
+                  </tr>
+                </thead>
+                <tbody id="taskSpendTable" class="text-center">
+                </tbody>
+              </table>
+
+              <span id="lblTaskSpendError" class="error hidden">Error During Task Spend Report Gen</span>
+            </div>
+
+            <!-- TODO Add Manual Spend Entry -->
+            <!-- <div class="modal-footer">
+              <button type="submit" class="btn btn-primary">Add</button>
+            </div> -->
+          </div>
+        </div>
+      </div>
     </main>
     
     <footer class="footer mt-auto py-3">
