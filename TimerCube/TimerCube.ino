@@ -1,58 +1,34 @@
-#include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
 #include <Wire.h>
 #include <stdio.h>
 #include <math.h>
 #include <SPI.h>
 #include <SD.h>
-#include <ESP8266HTTPClient.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
-#include "RTClib.h"
-#include <WiFiUdp.h>
-#include <NTPClient.h>
-#include <TimeLib.h> 
-#include <FastLED.h>
-#include <PubSubClient.h> // MQTT Library: https://pubsubclient.knolleary.net/api
-                          // With help from https://funprojects.blog/2018/12/07/rabbitmq-for-iot/
 
 #include "config.h"
+#include "functions.h"
+#include "time.h"
+#include "sd.h"
+#include "dice.h"
+#include "mqtt.h"
+#include "recording.h"
 
 // Stateful
-bool isRecording = false;
-int recordingID;
-char recordingFile[32];
-
-int recordingFace;
-int currentFace;
-
-int faceSwitchCounter = 0;
-bool isMotion = false;
+int face_switch_counter = 0;
 int slack = 0;
-
-// Thresholds
-int searchDirectionTimeout = SEARCH_DIRECTION_THRESHOLD * 1000 / SEARCH_DIRECTION_INTERVAL;
 
 // SD Card
 const int SdChipSelect = A0;
-File myFile;
-
-// Neopixel
-CRGB leds[LED_COUNT];
 
 // Instance
-Adafruit_MPU6050 mpu;
 HTTPClient http;
-WiFiClient client;
 ESP8266WebServer webserver(80);
-RTC_DS1307 rtc;
-WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, NTPServer);
-PubSubClient mqttClient(client); // Rabbit MQ
 
 /** SETUP :: Start **/
 bool setupWifi() {
-  WiFi.hostname(getDeviceUID());
+  WiFi.hostname(GetDeviceUID());
   WiFi.begin(WIFI_SSID, WIFI_PASS); 
 
   Serial.print("[WiFi] :: Connecting");
@@ -99,34 +75,6 @@ bool setupMPU() {
   return true;
 }
 
-bool setupRTC() {
-  Serial.print("[RTC] :: Init...");
-
-  if (!rtc.begin()) {
-    Serial.println("Failed");
-    return false;
-  }
-  Serial.println("Found!");
-
-  // Set the time with NTP server
-  timeClient.begin();
-  updateTime();
-
-  return true;
-}
-
-void updateTime() {
-  timeClient.update();
-
-  Serial.println("[RTC] :: Setting the time now...");
-  unsigned long unix_epoch = timeClient.getEpochTime();  // Get epoch time
-  rtc.adjust(DateTime(unix_epoch));  // Set RTC time using NTP epoch time
-  Serial.println("[RTC] :: Time has been set");
-
-  Serial.print("[RTC] :: The Time is Now: ");
-  Serial.println(getDateTimeNow());
-}
-
 bool setupSD() {
   Serial.print("[SD Card] Initializing SD card... ");
 
@@ -158,8 +106,6 @@ void setupWebServer() {
   webserver.on("/", httpIndex);
   webserver.begin();
 
-  webserver.handleClient(); // Listen for Web Requests
-
   Serial.println("[webserver] :: Started");
 }
 
@@ -168,26 +114,17 @@ void setupNeopixel() {
   Serial.println("[Neopixel] Init done.");
 
   delay(200);
-  SetLEDOff();
-}
-
-void setupInitVars() {
-  // Reset Recording State
-  isRecording = false;
-  isMotion = false;  
-
-  // Seed Random
-  srand(rtc.now().unixtime());
+  ClearDiceColour();
 }
 
 void setupNotice() {
   // Device ID
   Serial.print("[NOTICE] :: Device UUID: ");
-  Serial.println(getDeviceUID());
+  Serial.println(GetDeviceUID());
 
   // Search Duration Timeout
   Serial.print("[NOTICE] :: We will make ");
-  Serial.print(searchDirectionTimeout);
+  Serial.print(SEARCH_DIRECTION_THRESHOLD * 1000 / SEARCH_DIRECTION_INTERVAL);
   Serial.println(" attempts to determine direction/orientation after recording start.");
 
   // Ready To Go
@@ -199,9 +136,9 @@ void setup() {
   delay(3000);
   Serial.begin(SERIAL_BAUD);
   
-  setupIndicators(); // Setup Buzzer & other outputs (Shut the thing up if pin is HIGH on boot)
+  setupIndicators(); // Setup Buzzer & other outputs (Shut the thing up if buzzin' on boot)
 
-  // Setup MPU6050 (Gyro)1
+  // Setup MPU6050 (Gyro)
   if (!setupMPU()) {
     Serial.println("[ERROR] :: Failed to setup MPU6050");
     return;
@@ -219,7 +156,7 @@ void setup() {
   }
 
   // Setup RTC
-  if (!setupRTC()) {
+  if (!SetupRTC()) {
     Serial.println("[ERROR] :: Failed to setup RTC");
     return;
   }
@@ -230,216 +167,31 @@ void setup() {
   // Setup Neopixel
   setupNeopixel();
 
+  srand(rtc.now().unixtime()); // Seed Random
+  SetupRecording();
   setupWebServer(); // Setup Web Server
-  setupInitVars(); // Initialise run-time vars
   setupNotice(); // Ready to Go
 }
 /** SETUP :: End **/
 
-
-String getDeviceUID() {
-  return "TIMECUBE-" + String(ESP.getChipId());
-}
-
-String getDateTimeNow() {
-  DateTime now = rtc.now();
-  char buffer[] = "YYYY-MM-DDThh:mm:ss";
-  return now.toString(buffer);
-}
-
-int getRandomTaskID() {
-  return rand() % 100000 + 10000; // 10,000 - 100,000
-}
-
-/**
- * Generate a unique recording file path
- * Within RECORDING_DIR:
- *    -> EPOCH-RAND.xml
- */
-void getNewRecordingFilepath(char* outRecordingFile) {
-  char epochBuffer[32]; // For epoch
-  char idBuffer[6]; // For Recording ID
-  char filepath[64]; // New filepath
-
-  int epoch = rtc.now().unixtime();
-  sprintf(epochBuffer, "%d", epoch);
-
-  strcpy(filepath, "");
-
-  // Find unique filepath
-  while (strlen(filepath) == 0 || SD.exists(filepath)) {
-    recordingID = getRandomTaskID();
-    sprintf(idBuffer, "%d", recordingID);
-
-    strcpy(filepath, RECORDING_DIR);
-    strcat(filepath, epochBuffer);
-    strcat(filepath, "-");
-    strcat(filepath, idBuffer);
-    strcat(filepath, ".xml");
-  }
-
-  strcpy(outRecordingFile, filepath);
-}
-
-void blink(uint8_t Pin, int Count, int Duration) {
-  for (int i = 0; i < Count; i++) {
-    digitalWrite(Pin, HIGH); 
-    delay(Duration/2);
-    digitalWrite(Pin, LOW);
-    delay(Duration/2);
-  }
-}
-
 void motionDetected() {
-  if (isMotion || slack > 0) { return; }
+  if (is_motion || slack > 0) { return; }
 
-  updateTime(); // is this excessive?
   Serial.print("[MOTION] Motion Detected... ");
-  isMotion = true;
+  is_motion = true;
   slack = SLACK;
 
-  if (isRecording) {
-    logStopRecording();
+  if (is_recording) {
+    StopRecording();
     
   } else {
-    handleRecordingStart();
+    if (!StartRecording()) {
+      slack = 0;
+    }
   }
 
-  isMotion = false;
+  is_motion = false;
   delay(250);
-}
-
-bool handleRecordingStart() {
-  Serial.println("Starting Recording");
-  blink(BUZZER, 1, 250);
-  delay(750); // Allow time to position cube
-
-  int face = 0;
-
-  // Poll for direction until found or timeout reached
-  Serial.print("[MOTION] Detecting Direction...");
-  while (face == 0 && searchDirectionTimeout > 0) {
-    face = getFaceNow();
-
-    delay(SEARCH_DIRECTION_INTERVAL);
-    searchDirectionTimeout--;
-    Serial.print(".");
-  }
-
-  if (face == 0) {
-    Serial.println("Failed to detect direction after motion");
-    blink(BUZZER, 1, 2000);
-
-    isRecording = false;
-    isMotion = false;
-    slack = 0;
-    return false;
-  }
-  Serial.println(face);
-
-  //  Log Start
-  if(!logStartRecording(face)) {
-    return false;
-  }
-
-  // Set LED Colour
-  Serial.println("Setting Face Colour Now");
-  SetLEDColour(face);
-
-  isRecording = true;
-  recordingFace = face;
-  return true;
-}
-
-/**
- * Write out recording logging to file
- */
-bool logStartRecording(int face) {
-  getNewRecordingFilepath(recordingFile);
-
-  File dataFile = SD.open(recordingFile, FILE_WRITE);
-  Serial.print("Recording File Path: "); Serial.println(recordingFile);
-
-  if (!dataFile) { 
-    Serial.print("[logStartRecording] Error opening");
-    Serial.println(recordingFile);
-    return false;
-  }
-
-  String dataString = "";
-  dataString += "<deviceUID>"; dataString += getDeviceUID(); dataString += "</deviceUID>\r\n"; // Device UID
-  dataString += "<recordingID>"; dataString += recordingID; dataString += "</recordingID>\r\n"; // Recording ID (Local)
-  dataString += "<face>"; dataString += face; dataString += "</face>\r\n"; // Dice Face
-  dataString += "<start>"; dataString += getDateTimeNow(); dataString += "</start>"; // Start Date/Time
-
-  dataFile.println(dataString);
-  dataFile.close();
-  Serial.println(dataString);
-
-  return true;
-}
-
-/**
- * Close of a recording file.. we expect the filepath to exist
- */
-bool logStopRecording() {
-  Serial.println("Stopping Recording");
-  blink(BUZZER, 2, 150);
-    
-  if (!SD.exists(recordingFile)) {
-    Serial.print("[logStartRecording] Error opening (File does not exist): ");
-    Serial.println(recordingFile);
-    return false;
-    // TODO Maybe close off any "is recording" flags here...
-  }
-
-  File dataFile = SD.open(recordingFile, FILE_WRITE);
-
-  if (!dataFile) { 
-    Serial.print("[logStartRecording] Error opening");
-    Serial.println(recordingFile);
-    return false;
-  }
-
-  String dataString = "";
-  dataString += "<end>"; dataString += getDateTimeNow(); dataString += "</end>"; // End Date/Time
-
-  dataFile.println(dataString);
-  dataFile.close();
-  Serial.println(dataString);
-
-  // Turn off LEDs
-  SetLEDOff();
-
-  // Publish to MQTT Recording Finished
-  dataFile = SD.open(recordingFile, FILE_READ);
-  if (dataFile) {
-
-    // Read until nothing left
-    String fileContent;
-    fileContent += "<root>\n";
-    while (dataFile.available()) { 
-      fileContent += dataFile.readStringUntil('\r');
-    }
-    fileContent += "</root>";
-    dataFile.close();
-
-    // Publish to MQTT
-    String topic = "timer_mqtt/"; topic += recordingFile; // Append recording file path to the topic
-
-    Serial.println(fileContent);
-    if (mqttClient.publish(topic.c_str(), fileContent.c_str())) {
-      Serial.println("Msg Sent!");
-      // TODO Archive recording file
-
-    } else {
-      Serial.println("Failed to send msg");
-      // TODO Handle a failed to send msg
-    }
-  }
-
-  isRecording = false;
-  return true;
 }
 
 void loop() {
@@ -448,37 +200,33 @@ void loop() {
     motionDetected();
   }
 
-  /* MQTT */
-  if (!mqttClient.connected()) {
-    Serial.println("MQTT Client is not connected!");
-    reconnect();
-  }
-  mqttClient.loop(); // Maintain MQTT Connection
-
   /* Check current face matches what we're recording */
-  int currentFace = getFaceNow();
-  if (isRecording && currentFace != 0 && currentFace != recordingFace) {
-    faceSwitchCounter++;
+  int current_face = GetDiceFaceNow();
+  if (is_recording && current_face != 0 && current_face != face_recording) {
+    face_switch_counter++;
 
     // Wait a bit, check this is sensible
-    if (faceSwitchCounter > (FACE_SWITCH_THRESHOLD * 1000) / LOOP_DELAY) {
+    if (face_switch_counter > (FACE_SWITCH_THRESHOLD * 1000) / LOOP_DELAY) {
       Serial.println("Detect face switch! Moving to new face");
-      Serial.print("Old Face: "); Serial.println(recordingFace);
-      Serial.print("New Face: "); Serial.println(currentFace);
+      Serial.print("Old Face: "); Serial.println(face_recording);
+      Serial.print("New Face: "); Serial.println(current_face);
 
-      // Stop current recording
-      if (logStopRecording()) {
-        // Start new recording
-        if (!handleRecordingStart()) {
-          blink(BUZZER, 5, 200);
-        }
+      // Stop current recording & start new
+      if (!StopRecording()) {
+        blink(BUZZER, 5, 200);
+      }
+
+      if (!StartRecording()) {
+        blink(BUZZER, 5, 200);
       }
 
       // TODO Handle checking that this worked
 
-      faceSwitchCounter = 0;
+      face_switch_counter = 0;
     }
   }
+
+  webserver.handleClient(); // Listen for Web Requests
 
   /* Recording in progress */
   //digitalWrite(RECORDING_INDICATOR, (isRecording ? HIGH : LOW)); 
@@ -487,122 +235,36 @@ void loop() {
   slack = max(slack - 1, 0); // Slack acts like debounce to prevent multiple motion fire events from same motion.
 }
 
-bool fuzzyComp(double value, double threshold) {
-  return (value >= (threshold - ACCELERATION_ZERO_THRESHOLD) && value <= (threshold + ACCELERATION_ZERO_THRESHOLD));
-}
-
-int getFaceNow() {
-  sensors_event_t a, g, temp;
-  mpu.getEvent(&a, &g, &temp);
-  return currentFace = getFace(a.acceleration.x, a.acceleration.y, a.acceleration.z);
-}
-
-int getFace(double x, double y, double z) {
-  // X
-  if (fuzzyComp(x, -9.8)) { // X roughly -9.8
-    if (y < 0) { return 6; } else { return 11; }
-  }
-
-  if (fuzzyComp(x, -4.5)) { // X roughly -4.5
-    if (y < 0) { return 5; } else { return 7; }
-  }
-  
-  if (fuzzyComp(x, 0.0)) { // X roughly 0
-    if (fuzzyComp(y, -9.8)) {
-      return 1;
-    } else if (fuzzyComp(y, -4.5)) {
-      return 2;
-    } else if (fuzzyComp(y,  4.5)) {
-      return 10;
-    } else if (fuzzyComp(y,  9.0)) {
-      return 12;
-    }
-  }
-
-  if (fuzzyComp(x, 4.5)) { // X roughly 4.5
-    if (y < 0) { return 4; } else { return 8; }
-  }
-
-  if (fuzzyComp(x, 9.8)) { // X roughly 9.8 
-    if (y < 0) { return 3; } else { return 9; }
-  }
-
-  return 0; // We broke it!
-}
-
-void startRecordingTask(char* faceName) {
-  http.begin(client, API + "recording/start");
-  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
-  http.addHeader("APIKEY", APIKEY);
-
-  String postData = "DiceUUID=" + getDeviceUID() + "&FaceName=" + faceName;
-
-  int httpCode = http.POST(postData);
-  String payload = http.getString();
-
-  Serial.println(postData);
-  Serial.println(httpCode);
-  Serial.println(payload);
-
-  http.end();
-}
-
-void stopRecordingTask() {
-  // TODO
-}
-
-/** MQTT **/
-void reconnect() {
-  // Loop until we're reconnected
-  while (!mqttClient.connected()) {
-    Serial.print("Attempting MQTT connection...");
-
-    // Attempt to connect
-    if (mqttClient.connect(getDeviceUID().c_str(), MQTT_USER, MQTT_PASS)) {
-      Serial.println("connected");
-
-    } else {
-      Serial.print("failed, rc=");
-      Serial.print(mqttClient.state());
-      Serial.println(" try again in 5 seconds");
-      delay(5000);
-    }
-  }
-}
-
 /** HTTP Server **/
 void httpIndex() { 
-  webserver.send(200, "text/plain", "Hello World! Device UUID: " + getDeviceUID()); 
-}
+  String page = "";
 
-/** Neopixel **/
-void SetLEDColour(int face) {
+  page += "<html>";
+  page +=   "<head>";
+  page +=     "<title>"; page += GetDeviceUID(); page += "</title>"; 
+  page +=     "<style> body {color: #dee2e6;background-color: #212529;margin: 5%;font-family: Arial, Helvetica, sans-serif;}h1 {text-align: center;font-size: 2em;margin: 5% auto 2%;}table {border-collapse: collapse;min-width: 60%;margin: auto;}table td, table th {border: 1px solid #495057;padding: 8px;}table tr td:nth-child(1){font-weight: bold;}table tr.bold-border-top {border-top: 2px solid;}</style>";
+  page +=   "</head>";
+  page +=   "<body>";
+  page +=     "<h1>Timer Cube</h1>";
+  page +=     "<table><tbody>";
+  page +=     "<tr><td>Device UUID</td><td>"; page += GetDeviceUID(); page += "</td></tr>";
+  page +=     "<tr><td>API Key</td><td>"; page += APIKEY; page += "</td></tr>";
 
-  // https://github.com/FastLED/FastLED/wiki/Pixel-reference#predefined-colors-list
-  CRGB faceColours[] = {
-    CRGB::Black,      // 0 i.e. Off
-    CRGB::Red,        // 1
-    CRGB::Blue,       // 2
-    CRGB::Green,      // 3
-    CRGB::Orange,     // 4
-    CRGB::BlueViolet, // 5
-    CRGB::Chartreuse, // 6
-    CRGB::Cyan,       // 7
-    CRGB::Magenta,    // 8
-    CRGB::Grey,       // 9
-    CRGB::Maroon,     // 10
-    CRGB::OrangeRed,  // 11
-    CRGB::Aquamarine  // 12 
-  };
+  page +=     "<tr class='bold-border-top'><td>WiFi Network</td><td>"; page += WIFI_SSID; page += "</td></tr>";
+  page +=     "<tr><td>IP Address</td><td>"; page += WiFi.localIP().toString().c_str(); page += "</td></tr>";
 
-  for (int i = 0; i < LED_COUNT; i++) {
-    leds[i] = faceColours[face];
-  }
+  page +=     "<tr class='bold-border-top'><td>MQTT Server</td><td>"; page += MQTT_URL; page += "</td></tr>";
+  page +=     "<tr><td>MQTT User</td><td>"; page += MQTT_USER; page += "</td></tr>";
 
-  FastLED.show();
-  FastLED.delay(10);
-}
+  page +=     "<tr class='bold-border-top'><td>NTP Server</td><td>"; page += NTPServer; page += "</td></tr>";
+  page +=     "<tr><td>Current Time</td><td>"; page += GetDateTimeNow(); page += "</td></tr>";
 
-void SetLEDOff() {
-  SetLEDColour(0);
+  page +=     "<tr class='bold-border-top'><td>Number of Faces</td><td>"; page += DICE_FACES; page += "</td></tr>";
+  page +=     "<tr><td>Face Switch Threshold </td><td>"; page += FACE_SWITCH_THRESHOLD; page += " seconds</td></tr>";
+  page +=     "<tr><td>Recording Path</td><td>"; page += RECORDING_DIR; page += "</td></tr>";
+  page +=     "</tbody></table>";
+  page +=   "</body>";
+  page += "</html>";
+
+  webserver.send(200, "text/html", page); 
 }
