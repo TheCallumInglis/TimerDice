@@ -37,6 +37,7 @@
                     <tr>
                         <th>Task</th>
                         <th>Type</th>
+                        <th>External Task ID</th>
                         <th>Organisation</th>
                         <th>Actions</th>
                     </tr>
@@ -47,6 +48,7 @@
                         <tr>
                             <td>{{ task['taskname'] }}</td>
                             <td>{{ task['tasktype'] }}</td>
+                            <td class="text-center">{{ task['external_task_id'] or "" }}</td>
                             <td>{{ task['organisation'] }}</td>
                             <td>
                                 <a href="#" onclick="Timer.taskSpendReport({{task['taskid']}});">Spend</a>
@@ -104,6 +106,12 @@
                             <select class="form-select" id="addTaskType" name="addTaskType" required>
                                 <option selected disabled>Open this select menu</option>
                             </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="addTaskExternalID" class="col-form-label">External Task ID:</label>
+                            <div class="spinner-grow spinner-grow-sm text-warning ml-4 hidden" role="status" id="spinAddTaskExternalID"></div> 
+                            <input type="text" class="form-control" id="addTaskExternalID" name="addTaskExternalID" placeholder="Identifier for external task">
                         </div>
 
                         <div class="mb-3">

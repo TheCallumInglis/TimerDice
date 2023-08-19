@@ -68,6 +68,8 @@ SELECT
 	
 	tasktype.tasktypeid,
 	tasktype.name as tasktype,
+
+    tasks.external_task_id,
 	
 	organisation.organisationid,
 	organisation.name as organisation
