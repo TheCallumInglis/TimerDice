@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import timedelta, datetime
 import json
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, UUID, Integer, String, DateTime, Double, PrimaryKeyConstraint, Interval
@@ -55,9 +55,11 @@ class TaskType(Base, CustomSerializerMixin):
 
     tasktypeid = Column(Integer, primary_key=True)
     name = Column(String)
+    jsonconfig = Column(String)
 
-    def __init__(self, name):
+    def __init__(self, name, config = None):
         self.name = name
+        self.jsonconfig = json.dumps(config)
 
     def to_json(self):
         return json.dumps(self.to_dict(), default=lambda o: o.__dict__, sort_keys=True)
@@ -69,11 +71,13 @@ class Tasks(Base, CustomSerializerMixin):
     tasktype = Column(Integer)
     organisation = Column(Integer)
     name = Column(String)
+    external_task_id = Column(String)
 
-    def __init__(self, tasktype:int, organisation: int, name:String):
+    def __init__(self, tasktype:int, organisation: int, name:String, external_task_id:String):
         self.tasktype = tasktype
         self.organisation = organisation
         self.name = name
+        self.external_task_id = external_task_id
 
     def to_json(self):
         return json.dumps(self.to_dict(), default=lambda o: o.__dict__, sort_keys=True)
@@ -152,6 +156,12 @@ class Recording(Base, CustomSerializerMixin):
         self.user = user.userid
         self.starttime = diceRecording.starttime
         self.endtime = diceRecording.endtime
+
+    def getDurationInHours(self) -> float:
+        strptime_format = '%Y-%m-%dT%H:%M:%S'
+        duration = (datetime.strptime(self.endtime, strptime_format) - 
+                    datetime.strptime(self.starttime, strptime_format)) / timedelta(hours=1)
+        return duration
     
     def __repr__(self):
         return "<Recording(dice='{}', task='{}', User={}, starttime={}, endtime={})>"\
