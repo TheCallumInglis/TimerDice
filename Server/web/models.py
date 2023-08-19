@@ -63,6 +63,12 @@ class TaskType(Base, CustomSerializerMixin):
 
     def to_json(self):
         return json.dumps(self.to_dict(), default=lambda o: o.__dict__, sort_keys=True)
+    
+    def get_redacted(self):
+        redacted_dict = self.to_dict()
+        del redacted_dict['jsonconfig']; # Remove jsonconfig as this may contain API keys
+        redacted_dict['hasexternalconfig'] = self.jsonconfig != None and len(self.jsonconfig) > 0 
+        return redacted_dict
 
 class Tasks(Base, CustomSerializerMixin):
     __tablename__ = 'tasks'
@@ -73,7 +79,7 @@ class Tasks(Base, CustomSerializerMixin):
     name = Column(String)
     external_task_id = Column(String)
 
-    def __init__(self, tasktype:int, organisation: int, name:String, external_task_id:String):
+    def __init__(self, tasktype:int, organisation: int, name:String, external_task_id:String = None):
         self.tasktype = tasktype
         self.organisation = organisation
         self.name = name
@@ -220,6 +226,7 @@ class vw_tasks(Base, CustomSerializerMixin):
     taskname = Column(String)
     tasktypeid = Column(Integer)
     tasktype = Column(String)
+    external_task_id = Column(String)
     organisationid = Column(Integer)
     organisation = Column(String)
 

@@ -192,7 +192,12 @@ def api_tasks_assign():
 def api_tasks_add():
     if request.method == 'POST' and request.mimetype == 'multipart/form-data':
         # TODO Error Handling
-        new_task = Tasks(request.form['addTaskType'], request.form['addTaskOrganisation'], request.form['addTaskName'])
+        new_task = Tasks(
+            request.form['addTaskType'], 
+            request.form['addTaskOrganisation'], 
+            request.form['addTaskName'], 
+            (request.form['addTaskExternalID'] if 'addTaskExternalID' in request.form else None)
+        )
 
         try:
             with session_scope() as db:
@@ -236,6 +241,10 @@ def api_tasks_spend(task_id):
             "task_spend_report" : report, 
             "task" : get_task(task_id).to_dict()
         })
+
+@app.route('/api/tasktypes/<tasktype_id>', methods=['GET'])
+def api_tasktype(tasktype_id):
+    return make_response({ "tasktype" : get_tasktype(tasktype_id).get_redacted() })
 
 @app.route('/api/tasktypes', methods=['GET'])
 def api_tasktypes():

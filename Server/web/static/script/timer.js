@@ -253,12 +253,44 @@ const Timer = {
         Timer.frmAddTask = document.getElementById('frmAddTask');
         Timer.addTaskModal = new bootstrap.Modal(document.getElementById('addTaskModal'));
         Timer.lblAddTaskError = document.getElementById('lblAddTaskError');
+        Timer.txtAddTaskName = document.getElementById('addTaskName');
         Timer.optAddTaskType = document.getElementById('addTaskType');
+        Timer.spinAddTaskExternalID = document.getElementById('spinAddTaskExternalID');
+        Timer.txtAddTaskExternalID = document.getElementById('addTaskExternalID');
         Timer.optAddTaskOrganisation = document.getElementById('addTaskOrganisation');
 
         Timer.frmAddTask.addEventListener("submit", (e) => {
             e.preventDefault();
             Timer.addNewTask();
+        });
+
+        Timer.optAddTaskType.addEventListener("change", async (e) => {
+            e.preventDefault();
+            
+            // Check if task type requires an external task ID to function
+           console.log(Timer.optAddTaskType.value);
+
+           // Loading Icon
+           Timer.spinAddTaskExternalID.classList.remove("hidden");
+
+           let request = await fetch("/api/tasktypes/" + Timer.optAddTaskType.value);
+           let result = await request.json();
+
+            if (!result.hasOwnProperty("tasktype") || 
+                !result["tasktype"].hasOwnProperty("hasexternalconfig") || 
+                !result["tasktype"]["hasexternalconfig"]
+            ) {
+                console.log("External Task ID Not Required");
+                Timer.txtAddTaskExternalID.disabled = true;
+                Timer.txtAddTaskExternalID.required = false;
+                
+            } else {
+                Timer.txtAddTaskExternalID.disabled = false;
+                Timer.txtAddTaskExternalID.required = true;
+            }
+
+            // Loading Icon
+            Timer.spinAddTaskExternalID.classList.add("hidden");
         });
         
         Timer.btnAddNewTask.addEventListener('click', (e) => {
@@ -276,7 +308,7 @@ const Timer = {
         Timer.frmAddTaskType = document.getElementById('frmAddTaskType');
         Timer.addTaskTypeModal = new bootstrap.Modal(document.getElementById('addTaskTypeModal'));
         Timer.lblAddTaskTypeError = document.getElementById('lblAddTaskTypeError');
-        Timer.txtAddTaskTypeNmae = document.getElementById('addTaskTypeName');
+        Timer.txtAddTaskTypeName = document.getElementById('addTaskTypeName');
 
         Timer.btnAddNewTaskType.addEventListener('click', (e) => {
             e.preventDefault();
@@ -301,8 +333,11 @@ const Timer = {
         "use strict";
 
         Timer.lblAddTaskError.classList.add('hidden');
-        frmAddTask.elements.addTaskName.value = '';
+        frmAddTask.elements.addTaskName.value = "";
         frmAddTask.elements.addTaskType.innerHTML = "";
+        frmAddTask.elements.addTaskExternalID.disabled = true;
+        frmAddTask.elements.addTaskExternalID.required = false;
+        frmAddTask.elements.addTaskExternalID.value = "";
         frmAddTask.elements.addTaskOrganisation.innerHTML = "";
 
         // Fill Drop-down options : Task Type
@@ -349,6 +384,23 @@ const Timer = {
 
         Timer.lblAddTaskError.classList.add('hidden');
 
+        // Check Task Name, Type & Org Selected
+        let errors = [];
+        if (Timer.txtAddTaskName.value == "") {
+            errors.push("Task Name Missing");
+        }
+        if (Timer.optAddTaskType.value == "null" || Timer.optAddTaskType.value == "") {
+            errors.push("Task Type Missing");
+        }
+        if (Timer.optAddTaskOrganisation.value == "null" || Timer.optAddTaskOrganisation.value == "") {
+            errors.push("Organisation Missing");
+        }
+        if (errors.length > 0) {
+            Timer.lblAddTaskError.classList.remove("hidden");
+            Timer.lblAddTaskError.innerText = "Errors Encountered: " + errors.join(", ");
+            return;
+        }
+
         try {
             let response = await fetch(
                 "/api/tasks/add", 
@@ -386,6 +438,7 @@ const Timer = {
                 Timer.taskTable.innerHTML += `<tr>
                     <td>${result['tasks'][task]['taskname']}</td>
                     <td>${result['tasks'][task]['tasktype']}</td>
+                    <td class="text-center">${result['tasks'][task]['external_task_id'] || ""}</td>
                     <td>${result['tasks'][task]['organisation']}</td>
                     <td>
                         <a href="#" onclick="Timer.TaskDetailModal(${result['tasks'][task]['taskid']});">View</a>
