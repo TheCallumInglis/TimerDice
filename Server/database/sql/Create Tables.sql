@@ -32,12 +32,14 @@ CREATE TABLE tasks (
     taskid SERIAL PRIMARY KEY,
     tasktype int NOT NULL, -- FK TaskType.TaskTypeID
     organisation int NOT NULL, -- FK Organisation.OrganisationID
-    "name" text NOT NULL
+    "name" text NOT NULL,
+    external_task_id text NULL
 );
 
 CREATE TABLE tasktype (
     tasktypeid SERIAL PRIMARY KEY,
-    "name" text NOT NULL
+    "name" text NOT NULL,
+    jsonconfig text NULL
 );
 
 CREATE TABLE recording (

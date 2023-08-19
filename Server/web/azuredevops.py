@@ -2,8 +2,23 @@ import json
 import os
 import requests
 
+from models import Tasks, Recording
+from ExternalTask import ExternalTask
+
+
+# TODO: Each implementation of ExternalTask should prompt for a json config of type/config values, e.g. 
+# {
+#     "type" : "AzureDevops",
+#     "config" : {
+#         "organisation" : "",
+#         "project" : "",
+#         "api_version" : "7.0",
+#         "api_PAT" : "",
+#     }
+# }
+
 # https://learn.microsoft.com/en-us/rest/api/azure/devops/
-class AzureDevops():
+class AzureDevops(ExternalTask):
     _timeout = 10
 
     def __init__(self, organisation, project, pat, api_version) -> None:
@@ -23,7 +38,7 @@ class AzureDevops():
 
         if request.status_code != 200:
             print(f"He's dead jim... {request.status_code}")
-            return False
+            return None
 
         return request.json()
     
@@ -38,9 +53,41 @@ class AzureDevops():
 
         if request.status_code != 200:
             print(f"He's dead jim... {request.status_code}")
-            return False
+            return None
 
         return request.json()
+    
+    def UpdateEffort(self, task: Tasks, recording: Recording):
+        if task.external_task_id is None:
+            return # TODO Raise Exception
+        
+        work_item = self.get_work_item(task.external_task_id)
+
+        if (work_item is None):
+            raise Exception("Work Item Not Found") # TODO Be Specific
+        
+        if "Microsoft.VSTS.Scheduling.Effort" not in work_item["fields"]:
+            current_effort = 0
+        else:
+            current_effort = work_item['fields']['Microsoft.VSTS.Scheduling.Effort']
+
+        print(f"Item: {work_item['fields']['System.Title']}")
+        print(f"Current Effort: {current_effort} (hrs)")
+
+        print(f"Effort To Add {recording.getDurationInHours()}")
+
+        field_updates = [
+            AzureDevops.WorkItemFieldUpdate(
+                "add", 
+                "Microsoft.VSTS.Scheduling.Effort", 
+                current_effort + recording.getDurationInHours()
+            )
+        ]
+
+        updated_item = self.update_work_item(task.external_task_id, field_updates)
+        print(f"Updated Effort: {updated_item['fields']['Microsoft.VSTS.Scheduling.Effort']} (hrs)")
+        
+        return updated_item
 
     class WorkItemFieldUpdate():
         """Ref https://learn.microsoft.com/en-us/rest/api/azure/devops/wit/work-items/update?view=azure-devops-rest-7.0&tabs=HTTP#jsonpatchdocument"""
@@ -49,35 +96,3 @@ class AzureDevops():
             self.op = op
             self.path = f"/fields/{field}"
             self.value = value
-
-# Get the show on the road
-ORGANISATION = "4oh4ltd"
-PROJECT = "Sandbox"
-API_VER = "7.0"
-
-# Get PAT
-temp_pat = os.environ.get('AZURE_API_PAT')
-if temp_pat is None:
-    API_PAT = input("AZURE_API_PAT Not Set. Please Enter Your Personal Access Token Now: ")
-else:
-    API_PAT = temp_pat
-
-devops = AzureDevops(ORGANISATION, PROJECT, API_PAT, API_VER)
-
-# Get an item
-work_item = devops.get_work_item(13)
-current_effort = work_item['fields']['Microsoft.VSTS.Scheduling.Effort']
-
-print(f"Item: {work_item['fields']['System.Title']}")
-print(f"Current Effort: {current_effort} (hrs)")
-
-# List of fields to update
-field_updates = [
-    AzureDevops.WorkItemFieldUpdate(
-        "add", 
-        "Microsoft.VSTS.Scheduling.Effort", 
-        current_effort + 1 # + 1 hour to effort
-    )
-]
-updated_item = devops.update_work_item(13, field_updates)
-print(f"Updated Effort: {updated_item['fields']['Microsoft.VSTS.Scheduling.Effort']} (hrs)")

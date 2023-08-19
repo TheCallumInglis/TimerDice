@@ -13,6 +13,9 @@ from config import *
 from models import *
 from flask import Flask, render_template, request, Response, make_response
 
+from ExternalTask import ExternalTask
+from AzureDevops import AzureDevops
+
 app = Flask(__name__)
 pp = PrettyPrinter(indent=4)
 engine = create_engine(DATABASE_URI)
@@ -343,7 +346,13 @@ def get_task(task_id):
         task = db.query(Tasks).filter(Tasks.taskid == task_id).first()
         db.close()
         return task
-        
+
+def get_tasktype(tasktype_id):
+    with session_scope() as db:
+        tasktype = db.query(TaskType).filter(TaskType.tasktypeid == tasktype_id).first()
+        db.close()
+        return tasktype
+
 def create_recording(dice_recording:DiceRecording):
     """ Create A Dice Recording, consume dice_recording"""
     with session_scope() as db:
@@ -382,9 +391,38 @@ def create_recording(dice_recording:DiceRecording):
             print(ex)
             return Response("Error during recording creation", 503)
         
+        # Push through to external task handler
+        try:
+            external_task_handler(get_tasktype(task.tasktype), recording)
+
+        except Exception as ex:
+            print("Failed to push to external task handler: ")
+            print(ex)
+        
         # All good!
         return Response(None, 200)
 
+def external_task_handler(tasktype:TaskType, recording:Recording):
+    if tasktype.jsonconfig is None or tasktype.jsonconfig == "null":
+        raise Exception("No Action for Task Type")
+    
+    json_config = json.loads(tasktype.jsonconfig)
+
+    # Find External Task Handler
+    match json_config["type"]:
+        case "AzureDevops":
+            external_task:ExternalTask = AzureDevops(
+                json_config['config']['organisation'],
+                json_config['config']['project'],
+                json_config['config']['api_PAT'],
+                json_config['config']['api_version']
+            )
+
+        case _:
+            return
+    
+    # Push Through an update
+    external_task.UpdateEffort(get_task(recording.task), recording)
 # Controller End
 
 if __name__ == "__main__":
