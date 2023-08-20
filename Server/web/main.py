@@ -435,15 +435,17 @@ def external_task_handler(tasktype:TaskType, recording:Recording):
         raise Exception("No Action for Task Type")
     
     json_config = json.loads(tasktype.jsonconfig)
+    print(f"External Task Handler for type: {json_config['type']}")
 
     # Find External Task Handler
     match json_config["type"]:
-        case "AzureDevops":
+        case "AzureDevOps":
             external_task:ExternalTask = AzureDevops(
                 json_config['config']['organisation'],
                 json_config['config']['project'],
                 json_config['config']['api_PAT'],
-                json_config['config']['api_version']
+                json_config['config']['api_version'],
+                json_config['config']['effort_units']
             )
 
         case _:
