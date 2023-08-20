@@ -91,3 +91,8 @@ INSERT INTO apikey (apikey, "user") VALUES (
     (SELECT uuid_generate_v4()::text), 
     (SELECT userid FROM "user" WHERE "name" = 'Callum Inglis')
 );
+
+INSERT INTO integration (integration, presetjson) VALUES (
+    'Azure DevOps',
+    '{ "type" : "AzureDevOps", "config" : { "organisation" : "", "project" : "", "api_version" : "7.0", "api_PAT" : ""}}'
+);

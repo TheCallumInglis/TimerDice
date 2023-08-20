@@ -59,14 +59,15 @@ class TaskType(Base, CustomSerializerMixin):
 
     def __init__(self, name, config = None):
         self.name = name
-        self.jsonconfig = json.dumps(config)
+        if config is not None:
+            self.jsonconfig = json.dumps(json.loads(config)) 
 
     def to_json(self):
         return json.dumps(self.to_dict(), default=lambda o: o.__dict__, sort_keys=True)
     
     def get_redacted(self):
         redacted_dict = self.to_dict()
-        del redacted_dict['jsonconfig']; # Remove jsonconfig as this may contain API keys
+        del redacted_dict['jsonconfig'] # Remove jsonconfig as this may contain API keys
         redacted_dict['hasexternalconfig'] = self.jsonconfig != None and len(self.jsonconfig) > 0 
         return redacted_dict
 
@@ -131,6 +132,16 @@ class DiceFaceTask(Base, CustomSerializerMixin):
     def __init__(self, diceface:DiceFace, task:Tasks):
         self.diceface = diceface.dicefaceid
         self.task = task.taskid
+
+    def to_json(self):
+        return json.dumps(self.to_dict(), default=lambda o: o.__dict__, sort_keys=True)
+
+class Integration(Base, CustomSerializerMixin):
+    __tablename__ = 'integration'
+
+    integrationid = Column(Integer, primary_key=True)
+    integration = Column(String)
+    presetjson = Column(String)
 
     def to_json(self):
         return json.dumps(self.to_dict(), default=lambda o: o.__dict__, sort_keys=True)
