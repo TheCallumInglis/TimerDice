@@ -174,11 +174,24 @@ class Recording(Base, CustomSerializerMixin):
         self.starttime = diceRecording.starttime
         self.endtime = diceRecording.endtime
 
-    def getDurationInHours(self) -> float:
+    def getDelta(self) -> float:
         strptime_format = '%Y-%m-%dT%H:%M:%S'
-        duration = (datetime.strptime(self.endtime, strptime_format) - 
-                    datetime.strptime(self.starttime, strptime_format)) / timedelta(hours=1)
-        return duration
+        return (datetime.strptime(self.endtime, strptime_format) - 
+                datetime.strptime(self.starttime, strptime_format))
+
+    def getDuration(self, units) -> float:
+        """ Recording duration in the given units, i.e. Hours, Days"""
+        delta = self.getDelta()
+
+        match units:
+            case "hours":
+                return delta / timedelta(hours=1)
+
+            case "days":
+                return delta / timedelta(days=1)
+
+            case _:
+                return delta / timedelta(hours=1)
     
     def __repr__(self):
         return "<Recording(dice='{}', task='{}', User={}, starttime={}, endtime={})>"\
