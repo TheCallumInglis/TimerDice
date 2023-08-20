@@ -6,3 +6,7 @@ class ExternalTask(ABC):
     @abstractmethod
     def UpdateEffort(self, task:Tasks):
         pass
+
+    @abstractmethod
+    def SampleJsonConfig(self):
+        pass

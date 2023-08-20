@@ -15,8 +15,11 @@ const Timer = {
         switch (path) {
             case '/dice':
                 Timer.setupDiceJS();
+                break
+
             case '/tasks':
                 Timer.setupTasksJS();
+                break
         }
     },
 
@@ -259,6 +262,9 @@ const Timer = {
         Timer.txtAddTaskExternalID = document.getElementById('addTaskExternalID');
         Timer.optAddTaskOrganisation = document.getElementById('addTaskOrganisation');
 
+        // Add Task Type Modal
+        Timer.txtAddTaskTypeJsonConfig = document.getElementById('addTaskTypeJsonConfig');
+
         Timer.frmAddTask.addEventListener("submit", (e) => {
             e.preventDefault();
             Timer.addNewTask();
@@ -441,7 +447,7 @@ const Timer = {
                     <td class="text-center">${result['tasks'][task]['external_task_id'] || ""}</td>
                     <td>${result['tasks'][task]['organisation']}</td>
                     <td>
-                        <a href="#" onclick="Timer.TaskDetailModal(${result['tasks'][task]['taskid']});">View</a>
+                        <a href="#" onclick="Timer.taskSpendReport(${result['tasks'][task]['taskid']});">Spend</a>
                     </td>
                 </tr>`;
             }
@@ -456,6 +462,7 @@ const Timer = {
         "use strict";
         Timer.lblAddTaskTypeError.classList.add('hidden');
         frmAddTaskType.elements.addTaskTypeName.value = '';
+        frmAddTaskType.elements.addTaskTypeJsonConfig.value = '';
     },
 
     addNewTaskType: async () => {
@@ -485,6 +492,24 @@ const Timer = {
         } catch (error) {
             Timer.lblAddTaskTypeError.classList.remove('hidden');
             Timer.lblAddTaskTypeError.innerText = 'Failed to add task type... ' + error;
+        }
+    },
+
+    PreloadIntegrationJsonConfig: async (integrationid) => {
+        "use strict";
+
+        let response = await fetch("/api/integrations/" + integrationid);
+        let result = await response.json();
+
+        if (!result.hasOwnProperty("integration") || 
+            !result["integration"].hasOwnProperty("presetjson") || 
+            !result["integration"]["presetjson"]
+        ) {
+            Timer.txtAddTaskTypeJsonConfig.value = "";
+            
+        } else {
+            // pretty up the json out output
+            Timer.txtAddTaskTypeJsonConfig.value = JSON.stringify(JSON.parse(result["integration"]["presetjson"]), null, 4);
         }
     },
 

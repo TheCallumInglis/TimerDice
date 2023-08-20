@@ -63,6 +63,12 @@ CREATE TABLE dicefacetask (
     task int NOT NULL -- FK Tasks.TaskID
 );
 
+CREATE TABLE integration (
+    integrationid SERIAL PRIMARY KEY,
+    integration text NOT NULL,
+    presetjson text NOT NULL
+);
+
 -- Add Constraints
 -- ALTER TABLE [User]
 --     ADD CONSTRAINT FK_User_Organisation FOREIGN KEY (Organisation)

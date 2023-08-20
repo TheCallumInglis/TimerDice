@@ -60,7 +60,7 @@ def dice():
 
 @app.route('/tasks')
 def tasks():
-    return render_template('tasks.html', tasks=get_tasks(), tasktypes=get_tasktypes())
+    return render_template('tasks.html', tasks=get_tasks(), tasktypes=get_tasktypes(), integrations=get_integrations())
 
 @app.route('/about')
 def about():
@@ -261,7 +261,10 @@ def api_tasktypes():
 def api_tasktypes_add():
     if request.method == 'POST' and request.mimetype == 'multipart/form-data':
         # TODO Error Handling
-        new_task_type = TaskType(request.form['addTaskTypeName'])
+        new_task_type = TaskType(
+            request.form['addTaskTypeName'], 
+            (request.form['addTaskTypeJsonConfig'] if 'addTaskTypeJsonConfig' in request.form and len(request.form['addTaskTypeJsonConfig']) > 0 else None)
+        )
 
         try:
             with session_scope() as db:
@@ -280,6 +283,10 @@ def api_tasktypes_add():
             return Response('Server Error', 503)
     
     return Response(405) # Not Allowed
+
+@app.route('/api/integrations/<integration_id>', methods=['GET'])
+def api_integrations(integration_id):
+    return make_response({ "integration" : get_integration(integration_id).to_dict() })
 
 @app.route('/api/organisation', methods=['GET'])
 def api_organisation():
@@ -323,6 +330,18 @@ def get_tasktypes():
         tasktypes = db.query(TaskType).order_by(TaskType.name).all()
         db.close()
         return tasktypes
+
+def get_integration(integration_id):
+    with session_scope() as db:
+        integation = db.query(Integration).filter(Integration.integrationid == integration_id).first()
+        db.close()
+        return integation
+
+def get_integrations():
+    with session_scope() as db:
+        integrations = db.query(Integration).order_by(Integration.integration).all()
+        db.close()
+        return integrations
 
 def get_organisations():
     with session_scope() as db:

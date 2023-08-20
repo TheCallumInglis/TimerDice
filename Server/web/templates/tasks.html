@@ -29,7 +29,7 @@
 
     <div class="row">
 
-        <div class="col-lg-10">
+        <div class="col-lg-9">
             <h1>Tasks</h1>
 
             <table class="table table-striped table-bordered mt-4">
@@ -52,8 +52,8 @@
                             <td>{{ task['organisation'] }}</td>
                             <td>
                                 <a href="#" onclick="Timer.taskSpendReport({{task['taskid']}});">Spend</a>
-                                |
-                                <a href="#" onclick="Timer.TaskDetailModal({{task['taskid']}});">View</a>
+                                <!-- |
+                                <a href="#" onclick="Timer.TaskDetailModal({{task['taskid']}});">View</a> -->
                             </td>
                         </tr>   
                     {% endfor %}
@@ -61,7 +61,7 @@
             </table>
         </div>
 
-        <div class="col-lg-2">
+        <div class="col-lg-3">
             <h1>Types</h1>
 
             <div class="b-example-divider"></div>
@@ -147,6 +147,19 @@
                         <div class="mb-3">
                             <label for="addTaskTypeName" class="col-form-label">Task Type:</label>
                             <input type="text" class="form-control" id="addTaskTypeName" name="addTaskTypeName" required placeholder="Generic Task">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="addTaskTypeJsonConfig" class="col-form-label">External Integration (JSON Config):</label>
+                            <div class="my-1 mb-2">
+                                <span class="buttonslbl">Presets: </span>
+
+                                {% for integration in integrations %}
+                                <a class="badge rounded-pill text-bg-primary" onclick="Timer.PreloadIntegrationJsonConfig({{ integration['integrationid'] }});">{{ integration['integration'] }}</a>
+                                {% endfor %}
+                            </div>
+
+                            <textarea class="code" name="addTaskTypeJsonConfig" id="addTaskTypeJsonConfig" rows="10"></textarea>
                         </div>
 
                         <span id="lblAddTaskTypeError" class="error hidden">Error During Task Type Creation</span>

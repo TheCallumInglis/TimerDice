@@ -5,18 +5,6 @@ import requests
 from models import Tasks, Recording
 from ExternalTask import ExternalTask
 
-
-# TODO: Each implementation of ExternalTask should prompt for a json config of type/config values, e.g. 
-# {
-#     "type" : "AzureDevops",
-#     "config" : {
-#         "organisation" : "",
-#         "project" : "",
-#         "api_version" : "7.0",
-#         "api_PAT" : "",
-#     }
-# }
-
 # https://learn.microsoft.com/en-us/rest/api/azure/devops/
 class AzureDevops(ExternalTask):
     _timeout = 10
@@ -88,6 +76,9 @@ class AzureDevops(ExternalTask):
         print(f"Updated Effort: {updated_item['fields']['Microsoft.VSTS.Scheduling.Effort']} (hrs)")
         
         return updated_item
+    
+    def SampleJsonConfig(self):
+        return '{ "type" : "AzureDevOps", "config" : { "organisation" : "", "project" : "", "api_version" : "7.0", "api_PAT" : ""}}'
 
     class WorkItemFieldUpdate():
         """Ref https://learn.microsoft.com/en-us/rest/api/azure/devops/wit/work-items/update?view=azure-devops-rest-7.0&tabs=HTTP#jsonpatchdocument"""
