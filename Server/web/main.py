@@ -15,6 +15,7 @@ from flask import Flask, render_template, request, Response, make_response
 
 from ExternalTask import ExternalTask
 from AzureDevops import AzureDevops
+from GitLab import GitLab
 
 app = Flask(__name__)
 pp = PrettyPrinter(indent=4)
@@ -448,7 +449,15 @@ def external_task_handler(tasktype:TaskType, recording:Recording):
                 json_config['config']['effort_units']
             )
 
+        case "GitLab":
+            external_task:ExternalTask = GitLab(
+                json_config['config']['instance_domain'],
+                json_config['config']['project'],
+                json_config['config']['api_PAT']
+            )
+
         case _:
+            print(f"External Task Handler Not Defined! Given: {json_config['type']}")
             return
     
     # Push Through an update
