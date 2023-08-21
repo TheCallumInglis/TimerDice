@@ -37,3 +37,9 @@ a.badge.rounded-pill {
     text-decoration-line: none;
     cursor: pointer;
 }
+
+.right {
+    text-align: right;
+    display: block;
+    float: right;
+}

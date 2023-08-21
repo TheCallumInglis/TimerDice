@@ -247,6 +247,10 @@ def api_tasks_spend(task_id):
 def api_tasktype(tasktype_id):
     return make_response({ "tasktype" : get_tasktype(tasktype_id).get_redacted() })
 
+@app.route('/api/tasktypes/<tasktype_id>/extended', methods=['GET'])
+def api_tasktype_extended(tasktype_id):
+    return make_response({ "tasktype" : get_tasktype(tasktype_id).to_dict() })
+
 @app.route('/api/tasktypes', methods=['GET'])
 def api_tasktypes():
     if request.method == 'GET':
