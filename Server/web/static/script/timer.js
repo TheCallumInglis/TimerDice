@@ -513,6 +513,33 @@ const Timer = {
         }
     },
 
+    setupEditTaskType: async (tasktypeid) => {
+        "use strict";
+
+        Timer.ResetNewTaskTypeModal();
+
+        // Get task type
+        let response = await fetch("/api/tasktypes/" + tasktypeid + "/extended");
+        let result = await response.json();
+
+        if (!result.hasOwnProperty("tasktype") ||
+            !result["tasktype"].hasOwnProperty("name") ||
+            !result["tasktype"].hasOwnProperty("jsonconfig")
+        ) {
+            alert("Failed To Load Task Type! " + result); // TODO Temp
+            return;
+        }
+
+        // Push into view
+        // TODO TaskTypeID
+        Timer.txtAddTaskTypeName.value = result["tasktype"]["name"];
+        Timer.txtAddTaskTypeJsonConfig.value = JSON.stringify(JSON.parse(result["tasktype"]["jsonconfig"]), null, 4);
+
+        // TODO Handle edits rather than creates
+
+        Timer.addTaskTypeModal.show();
+    },
+
     refreshTaskTypesTable: async () => {
         "use strict";
 

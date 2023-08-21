@@ -75,7 +75,7 @@
                 <tbody id="tasktypeTable">
                     {% for tasktype in tasktypes %}
                         <tr>
-                            <td>{{ tasktype['name'] }}</td>
+                            <td>{{ tasktype['name'] }} <a href="#" class="right" onclick="Timer.setupEditTaskType({{ tasktype['tasktypeid'] }});"><i class="bi bi-pencil"></i></a></td>
                         </tr>   
                     {% endfor %}
                 </tbody>
