@@ -189,6 +189,38 @@ def api_tasks_assign():
         #     print("Hit Exception: %r" % exception)
         #     return Response('Server Error', 503)
 
+@app.route('/api/tasks', methods=['DELETE'])
+def api_tasks_delete():
+    if request.mimetype != 'application/json':
+        return Response("Invalid Application-Type. Expecting 'application/json'.", 406)
+    
+    content = request.json
+
+    if "diceid" not in content or "facenumber" not in content:
+        return Response("Bad Request. Expecting diceid and facenumber to be set.", 400)
+    
+    # Find Dice Face
+    dice_face = get_dice_face(content["diceid"], content["facenumber"])
+    if dice_face is None:
+        return Response("Dice Face not found", 404)
+    
+    # Find Dice-Face Task Assignment
+    dice_face_task:DiceFaceTask = get_dice_face_task(dice_face)
+    if dice_face_task is None:
+        return Response("No Task Assigned To Dice Face", 404)
+    
+    # Remove Dice Face Task Assignment
+    try:
+        with session_scope() as db:
+            db.query(DiceFaceTask).filter(DiceFaceTask.dicefacetaskid == dice_face_task.dicefacetaskid).delete()
+            db.commit()
+            db.close()
+
+            return Response("Task Removed", 200)
+    
+    except Exception as e:
+        return Response("Failed to Delete Task Assignment", 500)
+
 @app.route('/api/tasks/add', methods=['POST'])
 def api_tasks_add():
     if request.method == 'POST' and request.mimetype == 'multipart/form-data':
@@ -361,6 +393,12 @@ def get_efforts():
             effort.spend_time_pretty()
         db.close()
         return efforts
+
+def get_dice_face_task(diceface:DiceFace) -> DiceFaceTask:
+    with session_scope() as db:
+        dft = db.query(DiceFaceTask).filter(DiceFaceTask.diceface == diceface.dicefaceid).first()
+        db.close()
+        return dft
 
 def get_dice_face_tasks():
     with session_scope() as db:
