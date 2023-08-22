@@ -445,7 +445,7 @@ const Timer = {
 
         try {
             let response = await fetch(
-                "/api/tasks/add", 
+                "/api/tasks", 
                 {
                     method: 'POST',
                     body: new FormData(document.querySelector('#frmAddTask')),
@@ -508,7 +508,7 @@ const Timer = {
 
         try {
             let response = await fetch(
-                "/api/tasktypes/add", 
+                "/api/tasktypes", 
                 {
                     method: 'POST',
                     body: new FormData(document.querySelector('#frmAddTaskType')),
