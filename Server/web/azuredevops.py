@@ -2,7 +2,7 @@ import json
 import os
 import requests
 
-from models import Tasks, Recording
+from models import Tasks, Recording, ExternalTaskConfig
 from ExternalTask import ExternalTask
 
 # https://learn.microsoft.com/en-us/rest/api/azure/devops/
@@ -116,6 +116,12 @@ class AzureDevops(ExternalTask):
         
         return updated_item
     
+    def GetExternalTasks(self) -> list[ExternalTaskConfig]:
+        tasks = []
+        
+
+        return json.dumps([obj.__dict__ for obj in tasks])
+
     def SampleJsonConfig(self):
         return '{ "type" : "AzureDevOps", "config" : { "organisation" : "", "project" : "", "api_version" : "7.1-preview", "api_PAT" : "", "effort_units" : "hours"}}'
 

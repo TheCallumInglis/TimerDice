@@ -1,9 +1,12 @@
 import json
 import os
 import requests
+from pprint import PrettyPrinter
 
-from models import Tasks, Recording
+from models import Tasks, Recording, ExternalTaskConfig
 from ExternalTask import ExternalTask
+
+pp = PrettyPrinter(indent=4)
 
 # https://docs.gitlab.com/ee/api/
 class GitLab(ExternalTask):
@@ -59,5 +62,24 @@ class GitLab(ExternalTask):
         issue = self.AddTimeSpent(task.external_task_id, recording.getDuration("hours"), "Timer Dice Effort")
         return issue
     
+    def GetExternalTasks(self) -> list[ExternalTaskConfig]:
+        request = requests.get(
+            f"{self.api_url}/issues",
+            headers=self.api_auth,
+            timeout=self._timeout,
+        )
+
+        if request.status_code != 200:
+            print(f"Failed to fetch Gitlab Issues... {request.status_code}")
+            return None
+        
+        response = request.json()
+
+        tasks = []
+        for task in response:
+            tasks.append(ExternalTaskConfig(task['iid'], task['title']))
+
+        return json.dumps([obj.__dict__ for obj in tasks])
+
     def SampleJsonConfig(self):
         return '{"type":"GitLab","config":{"instance_domain":"","project":"","api_PAT":""}}'

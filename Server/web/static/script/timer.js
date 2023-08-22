@@ -252,7 +252,7 @@ const Timer = {
 
         try {
             let response = await fetch(
-                "/api/tasks", 
+                "/api/tasks/assign", 
                 {
                     method: 'DELETE',
                     headers: {
@@ -295,7 +295,9 @@ const Timer = {
         Timer.txtAddTaskName = document.getElementById('addTaskName');
         Timer.optAddTaskType = document.getElementById('addTaskType');
         Timer.spinAddTaskExternalID = document.getElementById('spinAddTaskExternalID');
-        Timer.txtAddTaskExternalID = document.getElementById('addTaskExternalID');
+        Timer.btnAddTaskExternalID = document.getElementById('btnAddTaskExternalID');
+        Timer.addTaskExternalIDManual = document.getElementById('addTaskExternalIDManual');
+        Timer.optAddTaskExternalID = document.getElementById('addTaskExternalID');
         Timer.optAddTaskOrganisation = document.getElementById('addTaskOrganisation');
 
         // Add Task Type Modal
@@ -310,7 +312,6 @@ const Timer = {
             e.preventDefault();
             
             // Check if task type requires an external task ID to function
-           console.log(Timer.optAddTaskType.value);
 
            // Loading Icon
            Timer.spinAddTaskExternalID.classList.remove("hidden");
@@ -323,12 +324,26 @@ const Timer = {
                 !result["tasktype"]["hasexternalconfig"]
             ) {
                 console.log("External Task ID Not Required");
-                Timer.txtAddTaskExternalID.disabled = true;
-                Timer.txtAddTaskExternalID.required = false;
+
+                // Disable, Clear & Hide Manual Task ID Entry
+                Timer.addTaskExternalIDManual.disabled = true;
+                Timer.addTaskExternalIDManual.required = false;
+                Timer.addTaskExternalIDManual.classList.add("hidden");
+
+                // Disable & Clear Dropdown
+                Timer.optAddTaskExternalID.disabled = true;
+                Timer.optAddTaskExternalID.required = false;
+                Timer.optAddTaskExternalID.classList.remove("hidden");
+                ClearSelect(Timer.optAddTaskExternalID);
+
+                // Hide Quick Links button
+                Timer.btnAddTaskExternalID.classList.add("hidden");
                 
             } else {
-                Timer.txtAddTaskExternalID.disabled = false;
-                Timer.txtAddTaskExternalID.required = true;
+                // Show Quick Links button & refresh external tasks list
+                Timer.btnAddTaskExternalID.classList.remove("hidden");
+                Timer.QuickLinkExternalTask();
+                return;
             }
 
             // Loading Icon
@@ -377,9 +392,18 @@ const Timer = {
         Timer.lblAddTaskError.classList.add('hidden');
         frmAddTask.elements.addTaskName.value = "";
         frmAddTask.elements.addTaskType.innerHTML = "";
+        Timer.btnAddTaskExternalID.classList.add('hidden');
+
         frmAddTask.elements.addTaskExternalID.disabled = true;
         frmAddTask.elements.addTaskExternalID.required = false;
-        frmAddTask.elements.addTaskExternalID.value = "";
+        ClearSelect(Timer.optAddTaskExternalID);
+
+        // Disable & Hide Manual Task ID Field
+        Timer.addTaskExternalIDManual.value = "";
+        Timer.addTaskExternalIDManual.disabled = true;
+        Timer.addTaskExternalIDManual.required = false;
+        Timer.addTaskExternalIDManual.classList.add("hidden");
+        
         frmAddTask.elements.addTaskOrganisation.innerHTML = "";
 
         // Fill Drop-down options : Task Type
@@ -491,6 +515,60 @@ const Timer = {
         } catch (error) {
             appendAlert('Failed to fetch tasks... ' + error.message, 'warning');
         }
+    },
+
+    QuickLinkExternalTask: async() => {
+        "use strict";
+
+        // Loading Icon
+        Timer.spinAddTaskExternalID.classList.remove("hidden");
+
+        Timer.lblAddTaskError.innerText = "";
+        Timer.lblAddTaskError.classList.add("hidden");
+
+        ClearSelect(Timer.optAddTaskExternalID);
+
+        let request = await fetch("/api/tasktypes/externaltasks/" + Timer.optAddTaskType.value);
+        let result = await request.json();
+
+        if (result.length == 0) {
+            // Disable & Hide External Task ID Dropdown
+            Timer.optAddTaskExternalID.disabled = true;
+            Timer.optAddTaskExternalID.required = false;
+            Timer.optAddTaskExternalID.classList.add("hidden");
+
+            // Require & Show Manual Task ID Field
+            Timer.addTaskExternalIDManual.disabled = false;
+            Timer.addTaskExternalIDManual.required = true;
+            Timer.addTaskExternalIDManual.classList.remove("hidden");
+
+            Timer.lblAddTaskError.innerText = "No External Tasks Found - Add Manually";
+            Timer.lblAddTaskError.classList.remove("hidden");
+            return;
+        }
+        
+        result.forEach(task => {
+            AddOptionToSelect(
+                Timer.optAddTaskExternalID, 
+                `#${task['external_task_id']}: ${task['name']}`,
+                task['external_task_id'],
+                false,
+                false
+            );
+        }); 
+
+        // Require & Show External Task ID Dropdown
+        Timer.optAddTaskExternalID.disabled = false;
+        Timer.optAddTaskExternalID.required = true;
+        Timer.optAddTaskExternalID.classList.remove("hidden");
+
+        // Disable & Hide Manual Task ID Field
+        Timer.addTaskExternalIDManual.disabled = true;
+        Timer.addTaskExternalIDManual.required = false;
+        Timer.addTaskExternalIDManual.classList.add("hidden");
+
+        // Loading Icon
+        Timer.spinAddTaskExternalID.classList.add("hidden");
     },
 
     // Task Type
@@ -634,6 +712,14 @@ const AddOptionToSelect = (el, text, value, selected = false, disabled = false) 
     option.disabled = disabled;
 
     el.add(option);
+}
+
+const ClearSelect = (el) => {
+    for(let i = el.options.length - 1; i >= 0; i--) {
+        el.remove(i);
+    }
+
+    AddOptionToSelect(el, 'Select...', null, true, true);
 }
 
 // Alert

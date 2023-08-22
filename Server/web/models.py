@@ -13,6 +13,11 @@ class DiceRecording():
     starttime = None
     endtime = None
 
+class ExternalTaskConfig():
+    def __init__(self, external_task_id, name):
+        self.external_task_id = external_task_id
+        self.name = name
+
 class CustomSerializerMixin(SerializerMixin):
     serialize_types = (
         (UUID, lambda x: String),
