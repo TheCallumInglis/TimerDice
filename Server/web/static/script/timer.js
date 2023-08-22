@@ -155,6 +155,10 @@ const Timer = {
         for (let face in result['faces']) {
             let assignTaskLink = (result['faces'][face]['taskname'] == null) ? 'Assign Task' : 'Change';
 
+            let clearTaskLink = (result['faces'][face]['taskname'] == null) 
+                ? '' 
+                : `| <a href="#" onclick="Timer.ClearDiceFaceTask(${result['faces'][face]['diceid']}, ${result['faces'][face]['facenumber']});">Clear</a>`;
+
             Timer.diceFaceTable.innerHTML += `<tr>
                 <td>${result['faces'][face]['facenumber']}</td>
                 <td>
@@ -169,6 +173,8 @@ const Timer = {
                         '${result['faces'][face]['uuid']}',
                         ${result['faces'][face]['facenumber']}
                     );">${assignTaskLink}</a>
+
+                    ${clearTaskLink}
                 </td>
             </tr>`;
         }
@@ -238,6 +244,36 @@ const Timer = {
         } catch (error) {
             Timer.lblAssignTaskToDiceFaceError.classList.remove('hidden');
             Timer.lblAssignTaskToDiceFaceError.innerText = 'Failed to assign task... ' + error;
+        }
+    },
+
+    ClearDiceFaceTask: async (diceid, facenumber) => {
+        "use strict";
+
+        try {
+            let response = await fetch(
+                "/api/tasks", 
+                {
+                    method: 'DELETE',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        'diceid' : diceid,
+                        'facenumber' : facenumber
+                    }),
+                }
+            );
+
+            if (response.status != 200) {
+                throw 'Bad Response, got: ' + response.status + '. Error: ' + await response.text();
+            }
+
+            await Timer.DiceDetailModal(diceid);
+
+        } catch (error) {
+            alert("BOOO");
         }
     },
     /** END DICE **/
