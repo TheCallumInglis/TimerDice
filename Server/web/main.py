@@ -67,62 +67,64 @@ def tasks():
 def about():
     return render_template('about.html')
 
-@app.route('/api/dice', methods=['GET', 'POST'])
+@app.route('/api/dice', methods=['GET'])
+def api_dice():
+    js_list = []
+    for dice in get_dice():
+        js_list.append(dice.to_dict())
+
+    return make_response({ "dice" : js_list })
+
 @app.route('/api/dice/<dice_id>', methods=['GET'])
-def api_dice(dice_id = None):
-    """ API Method: Create or Get a Dice"""
-    if request.method == 'GET':
-        if dice_id is None:
-            js_list = []
-            for dice in get_dice():
-                js_list.append(dice.to_dict())
+def api_dice_getbyid(dice_id):
+    if dice_id is None:
+        return Response("Expecting diceid, none given", 400)
 
-            return make_response({ "dice" : js_list })
+    # Return specific dice by its ID
+    with session_scope() as db:
+        this_dice = db.query(Dice).filter(Dice.diceid == dice_id).first()
 
-        else:
-            # Return specific dice by its ID
-            with session_scope() as db:
-                this_dice = db.query(Dice).filter(Dice.diceid == dice_id).first()
+        dice_faces = []
+        for face in db.query(vw_assignedtasks).filter(
+                vw_assignedtasks.diceid == dice_id
+            ).order_by(vw_assignedtasks.facenumber).all():
+            dice_faces.append(face.to_dict())
 
-                dice_faces = []
-                for face in db.query(vw_assignedtasks).filter(
-                        vw_assignedtasks.diceid == dice_id
-                    ).order_by(vw_assignedtasks.facenumber).all():
-                    dice_faces.append(face.to_dict())
+        db.close()
+        return make_response({ "dice" : this_dice.to_dict(), "faces" : dice_faces })
 
-                db.close()
-                return make_response({ "dice" : this_dice.to_dict(), "faces" : dice_faces })
-
-    elif request.method == 'POST' and request.mimetype == 'multipart/form-data':
-        # TODO Error Handling
-        new_dice = Dice(request.form['dice-uuid'], request.form['nickname'], request.form['faces'])
-
-        try:
-            with session_scope() as db:
-                # Check dice does not already exist
-                if db.query(Dice).filter(Dice.uuid == new_dice.uuid).count() > 0:
-                    return Response('Duplicate UUID', 409)
-                
-                # Create New Dice
-                db.add(new_dice)
-                new_dice:Dice = db.query(Dice).filter(Dice.uuid == new_dice.uuid).first()
-
-                # Create Dice Faces
-                for facenumber in range(0, int(new_dice.faces)):
-                    new_face:DiceFace = DiceFace(new_dice, facenumber + 1)
-                    db.add(new_face)
-
-                # Assign Dice to Default User
-                user_dice:UserDice = UserDice(1, new_dice)
-                db.add(user_dice)
-
-                return Response(new_dice.to_json(), 200)
-
-        except Exception as exception:
-            print("Hit Exception: %r" % exception)
-            return Response('Server Error', 503)
+@app.route('/api/dice', methods=['POST'])
+def api_dice_add():
+    if request.mimetype != 'multipart/form-data':
+        return Response("Invalid Application-Type. Expecting 'multipart/form-data'.", 406)
     
-    return Response(405) # Not Allowed
+    # TODO Error Handling
+    new_dice = Dice(request.form['dice-uuid'], request.form['nickname'], request.form['faces'])
+
+    try:
+        with session_scope() as db:
+            # Check dice does not already exist
+            if db.query(Dice).filter(Dice.uuid == new_dice.uuid).count() > 0:
+                return Response('Duplicate UUID', 409)
+            
+            # Create New Dice
+            db.add(new_dice)
+            new_dice:Dice = db.query(Dice).filter(Dice.uuid == new_dice.uuid).first()
+
+            # Create Dice Faces
+            for facenumber in range(0, int(new_dice.faces)):
+                new_face:DiceFace = DiceFace(new_dice, facenumber + 1)
+                db.add(new_face)
+
+            # Assign Dice to Default User
+            user_dice:UserDice = UserDice(1, new_dice)
+            db.add(user_dice)
+
+            return Response(new_dice.to_json(), 200)
+
+    except Exception as exception:
+        print("Hit Exception: %r" % exception)
+        return Response('Server Error', 503)
 
 @app.route('/api/tasks/available/<dice_id>', methods=['GET'])
 def api_tasks_available(dice_id = None):
@@ -152,6 +154,71 @@ def api_tasks():
         return make_response({ "tasks" : js_list })
     
     return Response("Method Not Allowed", 405)
+
+@app.route('/api/tasks', methods=['POST'])
+def api_tasks_add():
+    if request.method == 'POST' and request.mimetype == 'multipart/form-data':
+        # TODO Error Handling
+        new_task = Tasks(
+            request.form['addTaskType'], 
+            request.form['addTaskOrganisation'], 
+            request.form['addTaskName'], 
+            (request.form['addTaskExternalID'] if 'addTaskExternalID' in request.form else None)
+        )
+
+        try:
+            with session_scope() as db:
+                # Check Task does not already exist
+                if db.query(Tasks).filter(Tasks.name == new_task.name, Tasks.organisation == new_task.organisation).count() > 0:
+                    return Response('Duplicate Task within Organisation', 409)
+                
+                # Create New Task
+                db.add(new_task)
+                new_task:Tasks = db.query(Tasks).filter(
+                    Tasks.name == new_task.name, 
+                    Tasks.organisation == new_task.organisation, 
+                    Tasks.tasktype == new_task.tasktype
+                ).first()
+
+                return Response(new_task.to_json(), 200)
+
+        except Exception as exception:
+            print("Hit Exception: %r" % exception)
+            return Response('Server Error', 503)
+    
+    return Response(405) # Not Allowed
+
+@app.route('/api/tasks', methods=['DELETE'])
+def api_tasks_delete():
+    if request.mimetype != 'application/json':
+        return Response("Invalid Application-Type. Expecting 'application/json'.", 406)
+    
+    content = request.json
+
+    if "diceid" not in content or "facenumber" not in content:
+        return Response("Bad Request. Expecting diceid and facenumber to be set.", 400)
+    
+    # Find Dice Face
+    dice_face = get_dice_face(content["diceid"], content["facenumber"])
+    if dice_face is None:
+        return Response("Dice Face not found", 404)
+    
+    # Find Dice-Face Task Assignment
+    dice_face_task:DiceFaceTask = get_dice_face_task(dice_face)
+    if dice_face_task is None:
+        return Response("No Task Assigned To Dice Face", 404)
+    
+    # Remove Dice Face Task Assignment
+    try:
+        with session_scope() as db:
+            db.query(DiceFaceTask).filter(DiceFaceTask.dicefacetaskid == dice_face_task.dicefacetaskid).delete()
+            db.commit()
+            db.close()
+
+            return Response("Task Removed", 200)
+    
+    except Exception as e:
+        return Response("Failed to Delete Task Assignment", 500)
 
 @app.route('/api/tasks/assign', methods=['POST'])
 def api_tasks_assign():
@@ -188,71 +255,6 @@ def api_tasks_assign():
         # except Exception as exception:
         #     print("Hit Exception: %r" % exception)
         #     return Response('Server Error', 503)
-
-@app.route('/api/tasks', methods=['DELETE'])
-def api_tasks_delete():
-    if request.mimetype != 'application/json':
-        return Response("Invalid Application-Type. Expecting 'application/json'.", 406)
-    
-    content = request.json
-
-    if "diceid" not in content or "facenumber" not in content:
-        return Response("Bad Request. Expecting diceid and facenumber to be set.", 400)
-    
-    # Find Dice Face
-    dice_face = get_dice_face(content["diceid"], content["facenumber"])
-    if dice_face is None:
-        return Response("Dice Face not found", 404)
-    
-    # Find Dice-Face Task Assignment
-    dice_face_task:DiceFaceTask = get_dice_face_task(dice_face)
-    if dice_face_task is None:
-        return Response("No Task Assigned To Dice Face", 404)
-    
-    # Remove Dice Face Task Assignment
-    try:
-        with session_scope() as db:
-            db.query(DiceFaceTask).filter(DiceFaceTask.dicefacetaskid == dice_face_task.dicefacetaskid).delete()
-            db.commit()
-            db.close()
-
-            return Response("Task Removed", 200)
-    
-    except Exception as e:
-        return Response("Failed to Delete Task Assignment", 500)
-
-@app.route('/api/tasks/add', methods=['POST'])
-def api_tasks_add():
-    if request.method == 'POST' and request.mimetype == 'multipart/form-data':
-        # TODO Error Handling
-        new_task = Tasks(
-            request.form['addTaskType'], 
-            request.form['addTaskOrganisation'], 
-            request.form['addTaskName'], 
-            (request.form['addTaskExternalID'] if 'addTaskExternalID' in request.form else None)
-        )
-
-        try:
-            with session_scope() as db:
-                # Check Task does not already exist
-                if db.query(Tasks).filter(Tasks.name == new_task.name, Tasks.organisation == new_task.organisation).count() > 0:
-                    return Response('Duplicate Task within Organisation', 409)
-                
-                # Create New Task
-                db.add(new_task)
-                new_task:Tasks = db.query(Tasks).filter(
-                    Tasks.name == new_task.name, 
-                    Tasks.organisation == new_task.organisation, 
-                    Tasks.tasktype == new_task.tasktype
-                ).first()
-
-                return Response(new_task.to_json(), 200)
-
-        except Exception as exception:
-            print("Hit Exception: %r" % exception)
-            return Response('Server Error', 503)
-    
-    return Response(405) # Not Allowed
 
 @app.route('/api/tasks/spend/<task_id>', methods=['GET'])
 def api_tasks_spend(task_id):
@@ -294,7 +296,7 @@ def api_tasktypes():
 
     return Response("Method Not Allowed", 405)
 
-@app.route('/api/tasktypes/add', methods=['POST'])
+@app.route('/api/tasktypes', methods=['POST'])
 def api_tasktypes_add():
     if request.method == 'POST' and request.mimetype == 'multipart/form-data':
         # TODO Error Handling
