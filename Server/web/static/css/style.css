@@ -43,3 +43,7 @@ a.badge.rounded-pill {
     display: block;
     float: right;
 }
+
+.full-width {
+    width: 100%;
+}

@@ -159,11 +159,18 @@ def api_tasks():
 def api_tasks_add():
     if request.method == 'POST' and request.mimetype == 'multipart/form-data':
         # TODO Error Handling
+        external_task_id = None
+        if "addTaskExternalID" in request.form:
+            external_task_id = request.form['addTaskExternalID']
+
+        elif "addTaskExternalIDManual" in request.form:
+            external_task_id = request.form['addTaskExternalIDManual']
+
         new_task = Tasks(
             request.form['addTaskType'], 
             request.form['addTaskOrganisation'], 
             request.form['addTaskName'], 
-            (request.form['addTaskExternalID'] if 'addTaskExternalID' in request.form else None)
+            external_task_id
         )
 
         try:
@@ -187,38 +194,6 @@ def api_tasks_add():
             return Response('Server Error', 503)
     
     return Response(405) # Not Allowed
-
-@app.route('/api/tasks', methods=['DELETE'])
-def api_tasks_delete():
-    if request.mimetype != 'application/json':
-        return Response("Invalid Application-Type. Expecting 'application/json'.", 406)
-    
-    content = request.json
-
-    if "diceid" not in content or "facenumber" not in content:
-        return Response("Bad Request. Expecting diceid and facenumber to be set.", 400)
-    
-    # Find Dice Face
-    dice_face = get_dice_face(content["diceid"], content["facenumber"])
-    if dice_face is None:
-        return Response("Dice Face not found", 404)
-    
-    # Find Dice-Face Task Assignment
-    dice_face_task:DiceFaceTask = get_dice_face_task(dice_face)
-    if dice_face_task is None:
-        return Response("No Task Assigned To Dice Face", 404)
-    
-    # Remove Dice Face Task Assignment
-    try:
-        with session_scope() as db:
-            db.query(DiceFaceTask).filter(DiceFaceTask.dicefacetaskid == dice_face_task.dicefacetaskid).delete()
-            db.commit()
-            db.close()
-
-            return Response("Task Removed", 200)
-    
-    except Exception as e:
-        return Response("Failed to Delete Task Assignment", 500)
 
 @app.route('/api/tasks/assign', methods=['POST'])
 def api_tasks_assign():
@@ -255,6 +230,38 @@ def api_tasks_assign():
         # except Exception as exception:
         #     print("Hit Exception: %r" % exception)
         #     return Response('Server Error', 503)
+
+@app.route('/api/tasks/assign', methods=['DELETE'])
+def api_tasks_delete():
+    if request.mimetype != 'application/json':
+        return Response("Invalid Application-Type. Expecting 'application/json'.", 406)
+    
+    content = request.json
+
+    if "diceid" not in content or "facenumber" not in content:
+        return Response("Bad Request. Expecting diceid and facenumber to be set.", 400)
+    
+    # Find Dice Face
+    dice_face = get_dice_face(content["diceid"], content["facenumber"])
+    if dice_face is None:
+        return Response("Dice Face not found", 404)
+    
+    # Find Dice-Face Task Assignment
+    dice_face_task:DiceFaceTask = get_dice_face_task(dice_face)
+    if dice_face_task is None:
+        return Response("No Task Assigned To Dice Face", 404)
+    
+    # Remove Dice Face Task Assignment
+    try:
+        with session_scope() as db:
+            db.query(DiceFaceTask).filter(DiceFaceTask.dicefacetaskid == dice_face_task.dicefacetaskid).delete()
+            db.commit()
+            db.close()
+
+            return Response("Dice-Face Task Removed", 200)
+    
+    except Exception as e:
+        return Response("Failed to Delete Task Assignment", 500)
 
 @app.route('/api/tasks/spend/<task_id>', methods=['GET'])
 def api_tasks_spend(task_id):
@@ -323,9 +330,27 @@ def api_tasktypes_add():
     
     return Response(405) # Not Allowed
 
+@app.route('/api/tasktypes/externaltasks/<tasktype_id>', methods=['GET'])
+def api_tasktypes_externaltasks_get(tasktype_id):
+    tasktype:TaskType = get_tasktype(tasktype_id)
+
+    if tasktype is None:
+        return Response(json.dumps({'error' : 'Task Type Not Found'}), 404)
+
+    if tasktype.jsonconfig is None or tasktype.jsonconfig == "null":
+        return Response(json.dumps({'error' : 'No Action For Task Type'}), 404)
+    
+    external_task:ExternalTask = external_task_handler(tasktype)
+    if external_task is None:
+        return Response(json.dumps({'error' : 'Failed to initiate integration for task type'}), 500)
+    
+    response = make_response(external_task.GetExternalTasks())
+    response.content_type = 'application/json'
+    return response
+
 @app.route('/api/integrations/<integration_id>', methods=['GET'])
 def api_integrations(integration_id):
-    return make_response({ "integration" : get_integration(integration_id).to_dict() })
+    return make_response({ "integration" : get_integration(integration_id) })
 
 @app.route('/api/organisation', methods=['GET'])
 def api_organisation():
@@ -420,7 +445,7 @@ def get_task(task_id):
         db.close()
         return task
 
-def get_tasktype(tasktype_id):
+def get_tasktype(tasktype_id:int):
     with session_scope() as db:
         tasktype = db.query(TaskType).filter(TaskType.tasktypeid == tasktype_id).first()
         db.close()
@@ -466,7 +491,8 @@ def create_recording(dice_recording:DiceRecording):
         
         # Push through to external task handler
         try:
-            external_task_handler(get_tasktype(task.tasktype), recording)
+            external_task = external_task_handler(get_tasktype(task.tasktype))
+            external_task.UpdateEffort(get_task(recording.task), recording)
 
         except Exception as ex:
             print("Failed to push to external task handler: ")
@@ -475,7 +501,7 @@ def create_recording(dice_recording:DiceRecording):
         # All good!
         return Response(None, 200)
 
-def external_task_handler(tasktype:TaskType, recording:Recording):
+def external_task_handler(tasktype:TaskType) -> ExternalTask|None:
     if tasktype.jsonconfig is None or tasktype.jsonconfig == "null":
         raise Exception("No Action for Task Type")
     
@@ -502,10 +528,9 @@ def external_task_handler(tasktype:TaskType, recording:Recording):
 
         case _:
             print(f"External Task Handler Not Defined! Given: {json_config['type']}")
-            return
-    
-    # Push Through an update
-    external_task.UpdateEffort(get_task(recording.task), recording)
+            return None
+        
+    return external_task
 # Controller End
 
 if __name__ == "__main__":
