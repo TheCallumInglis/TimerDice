@@ -308,6 +308,11 @@ const Timer = {
             Timer.addNewTask();
         });
 
+        Timer.addTaskExternalIDManual.addEventListener("blur", async (e) => {
+            e.preventDefault();
+            Timer.LookupExternalTask();
+        });
+
         Timer.optAddTaskType.addEventListener("change", async (e) => {
             e.preventDefault();
             
@@ -569,6 +574,32 @@ const Timer = {
 
         // Loading Icon
         Timer.spinAddTaskExternalID.classList.add("hidden");
+    },
+
+    LookupExternalTask: async () => {
+        "use strict";
+
+        let response = await fetch(
+            `/api/tasktypes/externaltasks/${Timer.optAddTaskType.value}/${Timer.addTaskExternalIDManual.value}`
+        );
+
+        if (response.status !== 200) {
+            frmAddTask.elements.addTaskName.value = "";
+
+            Timer.spinAddTaskExternalID.classList.remove("hidden");
+            Timer.lblAddTaskError.innerText = "Task Lookup By ID Failed";
+            Timer.lblAddTaskError.classList.remove("hidden");
+            return;
+        }
+
+        let jsonResponse = await response.json();
+
+        // Push into view
+        frmAddTask.elements.addTaskName.value = jsonResponse['name'];
+
+        Timer.spinAddTaskExternalID.classList.add("hidden");
+        Timer.lblAddTaskError.innerText = "";
+        Timer.lblAddTaskError.classList.add("hidden");
     },
 
     // Task Type

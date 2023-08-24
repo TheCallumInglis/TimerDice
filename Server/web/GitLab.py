@@ -80,6 +80,14 @@ class GitLab(ExternalTask):
             tasks.append(ExternalTaskConfig(task['iid'], task['title']))
 
         return json.dumps([obj.__dict__ for obj in tasks])
+    
+    def GetExternalTaskByID(self, task_id) -> ExternalTask:
+        work_item = self.GetWorkItem(task_id)
+
+        if (work_item is None):
+            return None
+        
+        return ExternalTaskConfig(work_item['id'], work_item['description'])
 
     def SampleJsonConfig(self):
         return '{"type":"GitLab","config":{"instance_domain":"","project":"","api_PAT":""}}'

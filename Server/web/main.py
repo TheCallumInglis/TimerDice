@@ -348,6 +348,29 @@ def api_tasktypes_externaltasks_get(tasktype_id):
     response.content_type = 'application/json'
     return response
 
+@app.route('/api/tasktypes/externaltasks/<tasktype_id>/<task_id>', methods=['GET'])
+def api_tasktypes_externaltasks_byid_get(tasktype_id, task_id):
+    tasktype:TaskType = get_tasktype(tasktype_id)
+
+    if tasktype is None:
+        return Response(json.dumps({'error' : 'Task Type Not Found'}), 404)
+
+    if tasktype.jsonconfig is None or tasktype.jsonconfig == "null":
+        return Response(json.dumps({'error' : 'No Action For Task Type'}), 404)
+    
+    external_task:ExternalTask = external_task_handler(tasktype)
+    if external_task is None:
+        return Response(json.dumps({'error' : 'Failed to initiate integration for task type'}), 500)
+    
+    external_task_lookup = external_task.GetExternalTaskByID(task_id)
+    if external_task_lookup is None:
+        return make_response('Task Not Found', 404)
+    
+    response = make_response(json.dumps(external_task_lookup.__dict__))
+    response.content_type = 'application/json'
+    return response
+
+
 @app.route('/api/integrations/<integration_id>', methods=['GET'])
 def api_integrations(integration_id):
     return make_response({ "integration" : get_integration(integration_id) })

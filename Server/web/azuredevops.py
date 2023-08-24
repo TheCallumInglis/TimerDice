@@ -118,9 +118,15 @@ class AzureDevops(ExternalTask):
     
     def GetExternalTasks(self) -> list[ExternalTaskConfig]:
         tasks = []
-        
-
         return json.dumps([obj.__dict__ for obj in tasks])
+    
+    def GetExternalTaskByID(self, task_id) -> ExternalTaskConfig:
+        work_item = self.get_work_item(task_id)
+
+        if (work_item is None):
+            return None
+        
+        return ExternalTaskConfig(work_item['id'], work_item['fields']['System.Title'])
 
     def SampleJsonConfig(self):
         return '{ "type" : "AzureDevOps", "config" : { "organisation" : "", "project" : "", "api_version" : "7.1-preview", "api_PAT" : "", "effort_units" : "hours"}}'
