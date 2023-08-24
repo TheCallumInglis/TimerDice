@@ -12,5 +12,9 @@ class ExternalTask(ABC):
         pass
 
     @abstractmethod
+    def GetExternalTaskByID(self, task_id) -> ExternalTaskConfig:
+        pass
+
+    @abstractmethod
     def SampleJsonConfig(self):
         pass
