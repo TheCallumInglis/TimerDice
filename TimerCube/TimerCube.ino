@@ -7,6 +7,7 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 
+#include "secret.h"
 #include "config.h"
 #include "functions.h"
 #include "time.h"
