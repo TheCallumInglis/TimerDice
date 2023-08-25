@@ -97,11 +97,6 @@
                 <form id="frmAddTask">
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label for="addTaskName" class="col-form-label">Task Name:</label>
-                            <input type="text" class="form-control" id="addTaskName" name="addTaskName" required placeholder="Example Task 1">
-                        </div>
-                        
-                        <div class="mb-3">
                             <label for="addTaskType" class="col-form-label">Task Type:</label>
                             <select class="form-select" id="addTaskType" name="addTaskType" required>
                                 <option selected disabled>Open this select menu</option>
@@ -109,9 +104,23 @@
                         </div>
 
                         <div class="mb-3">
-                            <label for="addTaskExternalID" class="col-form-label">External Task ID:</label>
-                            <div class="spinner-grow spinner-grow-sm text-warning ml-4 hidden" role="status" id="spinAddTaskExternalID"></div> 
-                            <input type="text" class="form-control" id="addTaskExternalID" name="addTaskExternalID" placeholder="Identifier for external task">
+                            <label for="addTaskExternalID" class="col-form-label full-width">External Task ID:
+                                <div class="spinner-grow spinner-grow-sm text-warning ml-4 hidden" role="status" id="spinAddTaskExternalID"></div> 
+                                <a id="btnAddTaskExternalID" class="badge rounded-pill text-bg-primary right hidden" onclick="Timer.QuickLinkExternalTask();">Refresh Quick-Link Tasks</a>
+                            </label>
+
+                            <!-- Manually add Task -->
+                            <input type="text hidden" class="form-control" id="addTaskExternalIDManual" name="addTaskExternalIDManual" placeholder="Identifier for external task">
+
+                            <!-- Link to Existing -->
+                            <select class="form-select" id="addTaskExternalID" name="addTaskExternalID" placeholder="Identifier for external task">
+                                <option selected disabled>Open this select menu</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="addTaskName" class="col-form-label">Task Name:</label>
+                            <input type="text" class="form-control" id="addTaskName" name="addTaskName" required placeholder="Example Task 1">
                         </div>
 
                         <div class="mb-3">
