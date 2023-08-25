@@ -33,4 +33,4 @@ Populate as follows:
 |               	|              	|                                                                	|
 
 # Schematic
-TODO!
+![Timer Cube Schematic](Timer_Dice_schem.png)
