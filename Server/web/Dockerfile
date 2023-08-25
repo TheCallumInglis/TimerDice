@@ -5,7 +5,9 @@ RUN apt-get update -y && \
 
 RUN pip3 install SQLAlchemy && \
     pip3 install psycopg2-binary && \
-    pip3 install flask
+    pip3 install flask && \
+    pip3 install SQLAlchemy-serializer && \
+    pip3 install requests
 
 WORKDIR /web
 
