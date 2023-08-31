@@ -189,6 +189,9 @@ class Recording(Base, CustomSerializerMixin):
         delta = self.getDelta()
 
         match units:
+            case "seconds":
+                return delta / timedelta(seconds=1)
+            
             case "hours":
                 return delta / timedelta(hours=1)
 

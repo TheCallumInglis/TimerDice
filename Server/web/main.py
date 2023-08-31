@@ -16,6 +16,7 @@ from flask import Flask, render_template, request, Response, make_response
 from ExternalTask import ExternalTask
 from AzureDevops import AzureDevops
 from GitLab import GitLab
+from Jira import Jira
 
 app = Flask(__name__)
 pp = PrettyPrinter(indent=4)
@@ -373,7 +374,7 @@ def api_tasktypes_externaltasks_byid_get(tasktype_id, task_id):
 
 @app.route('/api/integrations/<integration_id>', methods=['GET'])
 def api_integrations(integration_id):
-    return make_response({ "integration" : get_integration(integration_id) })
+    return make_response({ "integration" : json.loads(get_integration(integration_id).to_json()) }) # TODO Tidy
 
 @app.route('/api/organisation', methods=['GET'])
 def api_organisation():
@@ -547,6 +548,13 @@ def external_task_handler(tasktype:TaskType) -> ExternalTask|None:
                 json_config['config']['instance_domain'],
                 json_config['config']['project'],
                 json_config['config']['api_PAT']
+            )
+
+        case "Jira":
+            external_task:ExternalTask = Jira(
+                json_config['config']['organisation'],
+                json_config['config']['username'],
+                json_config['config']['api_token']
             )
 
         case _:
